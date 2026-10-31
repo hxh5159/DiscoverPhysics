@@ -1,0 +1,10 @@
+{
+  "schema_version": "1.0.0",
+  "t_launch": 0.0,
+  "readout": [0.0, 0.1, 0.5, 1.0],
+  "background": [],
+  "probes": [
+    {"id": "probe-x", "pos": [1.0, 0.0], "vel": [0.0, 0.3], "properties": {}},
+    {"id": "probe-y", "pos": [0.0, 1.0], "vel": [-0.2, 0.0], "properties": {}}
+  ]
+}

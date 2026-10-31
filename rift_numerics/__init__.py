@@ -6,7 +6,7 @@ the fixed-step ``rollout`` entry point; alternate steps are explicitly named
 organizer convergence diagnostics.
 """
 from .rollout import DT, NUMERICS_VERSION, IMPLEMENTATION_VERSION
-from .rollout import rollout, diagnostic_rollout, sample_indices
+from .rollout import rollout, state_rollout, diagnostic_rollout, sample_indices
 
-__all__ = ["DT", "NUMERICS_VERSION", "IMPLEMENTATION_VERSION", "rollout",
+__all__ = ["DT", "NUMERICS_VERSION", "IMPLEMENTATION_VERSION", "rollout", "state_rollout",
            "diagnostic_rollout", "sample_indices"]

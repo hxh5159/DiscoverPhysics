@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shore:law-case:1.0.0",
+  "title": "Candidate prediction initial-value input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "t_launch", "readout", "background", "probes"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "t_launch": {"type": "number", "minimum": 0},
+    "readout": {"type": "array", "minItems": 1, "items": {"type": "number", "minimum": 0}},
+    "background": {"type": "array", "items": {"$ref": "#/$defs/body"}},
+    "probes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/body"}}
+  },
+  "$defs": {
+    "vector": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "number"}},
+    "scalarProperties": {
+      "type": "object",
+      "propertyNames": {"minLength": 1, "maxLength": 128},
+      "additionalProperties": {"type": "number"}
+    },
+    "body": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "pos", "vel", "properties"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "pos": {"$ref": "#/$defs/vector"},
+        "vel": {"$ref": "#/$defs/vector"},
+        "properties": {"$ref": "#/$defs/scalarProperties"}
+      }
+    }
+  },
+  "$comment": "结构Schema不以multipleOf模拟浮点网格。运行时validate_case统一检查有限实数、可打印ID/键、全case唯一ID、严格递增readout、0.005格点及1e-9tick表示误差容差；不静默取整非法时刻。"
+}

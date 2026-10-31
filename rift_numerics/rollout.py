@@ -13,7 +13,7 @@ import numpy as np
 
 DT = 0.005
 NUMERICS_VERSION = "1.1"
-IMPLEMENTATION_VERSION = "rift-numerics-1.0.0"
+IMPLEMENTATION_VERSION = "rift-numerics-1.1.0"
 ALIGNMENT_TOLERANCE_TICKS = 1e-9
 _W = 1.0 / (2.0 - 2.0 ** (1.0 / 3.0))
 YOSHIDA_C = (_W / 2, (1 - _W) / 2, (1 - _W) / 2, _W / 2)
@@ -71,7 +71,8 @@ def sample_indices(relative_times):
     return result
 
 
-def _integrate(acceleration: Callable, positions, velocities, t_launch, duration, dt):
+def _integrate(acceleration: Callable, positions, velocities, t_launch, duration, dt,
+               *, with_velocities=False):
     if not callable(acceleration):
         raise ValueError("acceleration must be callable.")
     pos = _state(positions, "positions")
@@ -93,7 +94,12 @@ def _integrate(acceleration: Callable, positions, velocities, t_launch, duration
         for c, d in zip(YOSHIDA_C[:-1], YOSHIDA_D):
             pos = pos + c * step_size * vel
             instant += c * step_size
-            result = np.asarray(acceleration(instant, pos), dtype=np.float64)
+            # Preserve the original position-only branch, including operation
+            # order. The formal law adapter also needs the actual velocity at
+            # this kick stage; it must never substitute a stale initial value.
+            value = (acceleration(instant, pos, vel) if with_velocities
+                     else acceleration(instant, pos))
+            result = np.asarray(value, dtype=np.float64)
             if result.shape != pos.shape:
                 raise ValueError("acceleration must return the same (N, 2) shape as positions.")
             if not np.all(np.isfinite(result)):
@@ -127,3 +133,16 @@ def diagnostic_rollout(acceleration: Callable, positions, velocities, *,
     validation and trusted formal prediction still use the fixed-step entry.
     """
     return _integrate(acceleration, positions, velocities, t_launch, duration, dt)
+
+
+def state_rollout(acceleration: Callable, positions, velocities, *,
+                  t_launch=0., duration=1.):
+    """Fixed-step entry whose callback receives current ``(t, x, v)``.
+
+    This is the same Yoshida drift/kick loop and frozen step as ``rollout``.
+    Exposing the current stage velocity changes no numerical convention and
+    does not let a candidate select a different solver or integration step.
+    """
+    _tick(t_launch, "t_launch", DT)
+    return _integrate(acceleration, positions, velocities, t_launch, duration,
+                      DT, with_velocities=True)

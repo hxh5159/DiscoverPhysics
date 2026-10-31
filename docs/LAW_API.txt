@@ -1,0 +1,66 @@
+law.py 与固定积分器使用规范 1.0.0
+
+一、由谁负责什么
+
+控制台实验：攻坚组调用 observe/launch，由指挥部私有模拟器推演并返回允许观测。
+本地检验：攻坚组提出候选规律后，自行调用公开 rift.rollout(law, case)，与已有观测比较并拟合参数。不查询真实宇宙，不扣实验额度，但消耗算力和探索墙钟。
+最终评测：智能体产出 law.py 与 claims.json。指挥部加载 law.py，传入测试初态和时刻，由官方固定驱动积分、生成预测轨迹，再按既有80/15/5规则评分。
+law.py 不需要提供 predict()，不自行选择积分器或返回预先计算的测试轨迹。JSON数学表达式不是正式提交格式。
+
+二、law.py 的固定入口
+
+    import numpy as np
+    LAW_API_VERSION = "1.0.0"
+    PARAMS = {}
+    BODY_PROPS = {}
+    HIDDEN = []
+
+    def acceleration(t, bodies, params):
+        return np.zeros((len(bodies), 2), dtype=np.float64)
+
+以上零加速度仅展示接口。可运行的独立接口例子位于 examples/law.py，不代表任何正式宇宙。
+
+LAW_API_VERSION 是接口版本，不是待拟合常数。
+PARAMS 是至多5个有限实标量的字面量字典；不得用数组或bool代替标量。
+BODY_PROPS 可省略，按可见背景ID补充推断的未知数值属性。官方已知输入优先：重复同值允许，冲突不能覆盖。
+HIDDEN 可省略，每项为 {"id":字符串,"pos":[x,y],"vel":[vx,vy],"properties":数值字典}；初态相对于物理t=0。ID无前缀要求，必须与其他对象唯一。
+BODY_PROPS/HIDDEN不是额外claims；既有对象属性与几何表达豁免PARAMS五标量上限。
+元数据使用Python字面量；普通固定数学常量和数学辅助函数可定义。允许math、NumPy、SciPy数学运算。程序不得读写文件、联网或依赖随机/外部可变状态，不在顶层启动其他工作流。
+
+三、加速度函数拿到什么
+
+t 为积分内部的绝对物理时间，内部子步不一定在0.005采样网格上；不要在函数内舍入它。
+bodies 为只读tuple，每个对象有 id、kind、pos、vel、properties。kind为background、hidden或probe。
+pos/vel 是该子步的二维候选状态，不是真实未来数据；params及properties也只读。拟合时以传入的params和对象属性为准。
+返回与本次bodies顺序等长的(N_body,2)实数加速度。list、tuple和NumPy实数数组均可，统一转换为float64；形状错误、bool、复数和非有限值明确报错。
+背景/候选隐藏对象先从t=0推演至投放时刻。为保证被动性，背景回调不含探针，每个探针回调只含背景/候选隐藏对象与它自身；不要假设bodies总长度恒定，用id/kind识别对象。
+
+四、统一推演输入与输出
+
+case只含schema_version、t_launch、readout、background、probes；schema_version为1.0.0。
+background和probes均为对象列表，每条恰含id、pos、vel、properties。背景初态在物理0，探针初态在t_launch。
+每次实验已知的源侧控制值已合入相应背景对象的properties；没有真实未知源强、真实隐藏对象或未来轨迹。内部测试名称、分组标签不传给law.py。
+t_launch与readout分别严格校验0.005网格，readout非负且严格递增，可包含0。只容忍浮点表示尾差，不把非网格请求吸附到附近时刻。
+
+    from rift import load_law, rollout
+    law = load_law("law.py")
+    prediction = rollout(law, case)
+
+prediction含times、readout、probe_ids、positions、velocities、numerics_version。位置与速度形状为(T,N_probe,2)，按readout及case.probes顺序排列。
+从控制台公开记录构造本地case，可用case_from_observation(mission, record)。若存在源侧控制，应从任务说明取得明确的source_property_target_id，或显式传入source_target_id；不由SDK猜测真实力场。
+固定数值协议为Yoshida4、步长0.005、float64及既有0.05幅值软化约定。两边调用同一实现；队伍不能在law.py中换成自己的积分器。
+
+五、提交前检查
+
+以下命令在远端项目根目录运行：
+
+    python scripts/validate_law.py examples/law.py --claims docs/contracts/claims.example.json
+    python scripts/validate_law.py examples/law.py --case examples/law_case.json --execute
+
+替换为本组文件后，第一条只做静态格式检查，不执行候选或判物理正确性；第二条才运行独立候选worker做本地推演。--timeout是本地检查护栏，不是正式计分时限。
+检查错误给出code/path/message；修复后可以再次检查。law.py与claims.json须作为同一配对通过检查；坏提交不覆盖上一份有效配对。
+预检通过不保证科学正确。候选计算错误按既有无效预测规则处理；官方case/grid或基础设施错误必须先修复，不算作队伍物理预测错误。
+UTF-8 BOM、LF/CRLF均接受；加速度返回值的正常list/tuple/实数dtype差异不会产生格式惩罚。时间输入仍须满足严格网格及其浮点容差。源字节摘要只记录制品身份，不是代码评分项。
+
+机器规范见 docs/contracts/law_api.json 和 law_case.schema.json；格式实现以已发布版本的公开检查器为准。
+当前候选SDK、加载、固定推演与私有评测桥已测试；正式控制台服务、执行权限与远端镜像/榜单集成仍需验收。

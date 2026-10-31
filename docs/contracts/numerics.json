@@ -1,7 +1,7 @@
 {
   "numerics_version": "1.1",
   "updated": "2026-10-31",
-  "implementation_status": "公开纯数值共享核心已实现，候选与私有真值调用同一loop且回归通过；正式rift.rollout对象适配、权限隔离与远端验收仍待完成",
+  "implementation_status": "统一候选law SDK和固定积分worker已实现，与私有真值工程对照通过；完整正式服务/权限与远端镜像仍待集成",
   "integrator": "yoshida4",
   "dt": 0.005,
   "dtype": "float64",
@@ -50,12 +50,13 @@
   },
   "shared_module": {
     "package": "rift_numerics",
-    "implementation_version": "rift-numerics-1.0.0",
-    "formal_entry": "rift_numerics.rollout(acceleration, positions, velocities, t_launch=..., duration=...)",
+    "implementation_version": "rift-numerics-1.1.0",
+    "formal_entry": "rift.rollout(loaded_law,canonical_case)",
     "fixed_step": 0.005,
     "contains_true_world_laws": false,
-    "scope": "仅冻结数学积分；对象/属性与候选提交适配层仍待接入，不等于完整参赛SDK",
+    "scope": "候选SDK负责t0背景预推、探针插入、被动性和对象/输出适配；下层state_rollout与既有rollout共用冻结数学循环",
     "diagnostic_entry": "diagnostic_rollout使用同一loop做指挥部步长收敛检查，不是队伍可选正式积分精度"
   },
-  "prediction_program_protocol": "已确认队伍提交可执行预测程序，运行时接收测试初态/时刻并调用固定rollout返回轨迹；仅有纯数学共享核心不代表通用装载/执行适配已完成"
+  "prediction_program_protocol": "law.py只暴露acceleration(t,bodies,params)；队伍本地拟合与指挥部正式驱动均使用同一rift.rollout，law不提供predict或自选积分方法",
+  "state_callback": "新state_rollout为候选回调提供当前子步速度；既有两参数位置回调算术不变，数学numerics仍1.1。固定drift/kick不等于对任意速度依赖/不光滑候选都承诺理论四阶收敛"
 }

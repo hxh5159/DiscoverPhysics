@@ -1,0 +1,74 @@
+{
+  "law_api_version": "1.0.0",
+  "updated": "2026-10-31",
+  "artifact": "law.py",
+  "ownership": {
+    "true_experiments": "攻坚组调用控制台observe/launch；指挥部私有模拟器使用固定数值实现返回允许观测，不向队伍提供真实力场",
+    "local_candidate_prediction": "攻坚组用允许观测自行拟合，通过公开rift.rollout(loaded_law,case)推演候选，不查询真实宇宙，不扣实验配额",
+    "formal_prediction": "指挥部加载最终law.py，使用同一固定rift.rollout生成隐藏验证的候选轨迹；law.py不提供积分器或predict轨迹入口",
+    "scoring": "仅轨迹误差、三个claims及能量账本参与既有80/15/5计分；不按代码样式或公式相似度给分"
+  },
+  "module": {
+    "encoding": "UTF-8，允许BOM及LF/CRLF；源字节摘要用于制品身份，不因这些格式差异改变科学分数",
+    "required": {
+      "LAW_API_VERSION": "字面量字符串1.0.0，非物理参数",
+      "PARAMS": "字面量dict，至多5个有限实标量；bool、数组、NaN/Inf不是合法标量",
+      "acceleration": "def acceleration(t,bodies,params)，三个位置参数，名字固定为acceleration；参数变量名可不同，不带默认参数"
+    },
+    "optional": {
+      "BODY_PROPS": "字面量dict：可见背景对象ID→候选未知属性dict。只补未公开属性，不能修改已知初态/属性；重复同值可接受，冲突拒绝",
+      "HIDDEN": "字面量list，每条恰含id,pos,vel,properties；pos/vel为物理t=0的二维候选初态；不要求特定ID前缀，ID须与本case全部对象唯一"
+    },
+    "scalar_and_id_format": "元数据标量为有限int/float且非bool；ID/属性键为1至128个可打印字符。元数据二维向量允许literal list或tuple并规范化",
+    "parameter_cap": "PARAMS≤5；BODY_PROPS及HIDDEN的既有未知对象属性/几何表达豁免，仍不新增claims字段。静态预检不声称能判别任意代码数字是否属于拟合常数",
+    "libraries": ["math", "numpy", "scipy"],
+    "fixed_math_constants": "允许固定数学字面量/只读常量及np.pi/math.pi等纯算术；可定义数学辅助函数",
+    "execution": "确定性纯数学计算，不读写文件、不联网、不使用随机或外部可变状态；不导入/替换积分器，不在顶层启动工作流",
+    "technical_source_bytes_default": 1048576,
+    "technical_limit_scope": "格式/资源护栏明确报错，不新增科学得分。正式镜像和资源配置须统一公布"
+  },
+  "acceleration": {
+    "t": "绝对物理时间；积分内部子步可能不在公开0.005采样网格，不得在回调内把t吸附到网格",
+    "bodies": "只读tuple，每条为只读mapping，恰含id,kind,pos,vel,properties",
+    "kind_values": ["background", "hidden", "probe"],
+    "pos_vel": "当前子步真实候选位置/速度，float64二维只读数组；不是未来真值或独立观测",
+    "properties": "只读mapping，官方已知输入与合法候选未知属性的合并结果",
+    "params": "本次推演的只读PARAMS；拟合时应使用传入params及bodies属性计算",
+    "return": "与本次bodies顺序等长的(N_body,2)有限实加速度；list/tuple/NumPy实数数组均可，统一float64；不接受bool/complex/NaN/Inf或不符形状",
+    "passive_probe_protocol": "背景/候选隐藏对象的回调不含探针；计算某探针时只给背景/隐藏对象和该探针，采用该探针对应返回行。因此探针互不作用、不能反馈背景",
+    "row_order": "背景按case顺序，候选隐藏对象按HIDDEN顺序，随后为本次探针。用id/kind识别，不假设回调长度恒定"
+  },
+  "case": {
+    "schema_file": "law_case.schema.json",
+    "schema_version": "1.0.0",
+    "root_fields": ["schema_version", "t_launch", "readout", "background", "probes"],
+    "body_fields": ["id", "pos", "vel", "properties"],
+    "initial_epoch": "background为共同物理t=0初态；probes为t_launch时的投放初态；HIDDEN只来自law候选",
+    "source_controls": "已知本次源侧设置预先合入对应background对象properties，不把未知真实源强传入。case_from_observation要求明确控制目标ID，不猜宇宙或作用规律",
+    "excluded": ["真实未来轨迹", "真实隐藏源状态", "未知真实源强", "内部name/group/机制标签", "评分真值"],
+    "grid": "t_launch与各readout分别按0.005严格校验为tick，再相加生成绝对时刻；只容忍1e-9tick浮点表示误差，非网格拒绝",
+    "case_counts": "控制台8探针/50读数限制属于探索仪器；不误套到正式验证case。通用预测函数单独使用统一工程资源护栏"
+  },
+  "rollout": {
+    "entry": "rift.rollout(law,case)",
+    "background": "先从t=0推进背景和候选隐藏对象至t_launch，再插入探针并共同子步推进，不注入未来背景",
+    "numerics_version": "1.1",
+    "integrator": "Yoshida4",
+    "dt": 0.005,
+    "dtype": "float64",
+    "softening": "既有幅值rho与未软化方向约定保持；加速度负责使用软化，积分器不重复修改加速度",
+    "output_keys": ["times", "readout", "probe_ids", "positions", "velocities", "numerics_version"],
+    "position_velocity_shape": "(T,N_probe,2)，T对应readout顺序，N_probe对应case.probes顺序",
+    "preliminary_technical_guards": {"max_steps": 200000, "max_state_records": 5000000},
+    "guard_scope": "宽松、可配置工程默认，不是新增物理时域、仪器额度或已冻结评分超时；正式配置须覆盖合法目录并向各组一致公布"
+  },
+  "preflight": {
+    "default": "python scripts/validate_law.py law.py --claims claims.json：静态检查，不执行候选、不判物理正确性",
+    "local_execution": "显式--case case.json --execute才以独立候选worker运行同一固定推演",
+    "pairing": "law.py与claims.json同时通过格式检查后冻结配对；错误提交不覆盖上份有效配对",
+    "execution_errors": "候选报错、形状错误、非有限输出或约定资源超限按既有无效预测规则处理，不丢弃失败样本",
+    "organizer_errors": "官方case/grid无效或运行基础设施失败应中止并修复/重评，不能直接算作队伍物理预测错误",
+    "status_limit": "本地预检通过不保证隐藏测试科学正确，不新增代码分或自洽分"
+  },
+  "implementation_boundary": "公开候选SDK/加载/worker与私有配对/评测桥已实现并测试；真实控制台与正式服务权限/榜单/远端镜像仍需集成验收。无正式九宇宙真值代码进入此SDK"
+}

@@ -1,15 +1,16 @@
 {
-  "review_version": "1.5.0",
+  "review_version": "1.6.0",
   "review_date": "2026-10-31",
   "scope": "实现前审查及已实现私有数值/带噪配额/评分/白名单传输试做；正式服务、模型能力及最终范围仍未验收",
   "basis": {
     "statement": "docs/彼岸物理规律发现挑战赛_赛题说明.docx",
-    "exploration": "3.6.0",
+    "exploration": "3.7.0",
     "claims": "4.0.0",
-    "scoring": "draft-3.6.0",
+    "scoring": "draft-3.7.0",
     "numerics": "1.1",
     "feedback": "1.0.0",
-    "observation_noise": "1.0.0"
+    "observation_noise": "1.0.0",
+    "law_api": "1.0.0"
   },
   "implementation_ready": false,
   "constant_policy_review": {
@@ -45,8 +46,8 @@
       ],
       "issue": "采用DP式已知可见背景t0干净初态，由候选自行推演；不逐步注入真实未来背景或隐藏状态。仅评验证探针，源属性只公开已知目录语义",
       "impact": "两种路线科学任务和权限不同；逐步注入真实B(t)可能构成不消耗observe的干净背景通道",
-      "minimum_resolution": "实现稳定ID及候选状态接口、探针单向耦合和t_launch插入；不自动添加固定标签或将平衡静止体硬钉住。逐世界内部背景表已私有保存",
-      "status": "设计已明确，完整schema/运行适配待实现"
+      "minimum_resolution": "canonicalcase只给公开初态/属性，BODY_PROPS/HIDDEN候选补全；先推背景再插探针，回调无探针间/对背景反馈。公开模板和字段规范已提供",
+      "status": "候选SDK已实现并验证背景预推/同子步/探针被动性，正式控制台集成待验收"
     },
     {
       "id": "A02",
@@ -114,10 +115,10 @@
         "草稿任务包和law.py接口",
         "exploration_protocol.json:parameter_count_policy"
       ],
-      "issue": "用户已选择提交可执行预测程序：指挥部运行时传入测试初态与时刻，程序调用官方固定积分器返回轨迹；不收预先计算的轨迹文件。通用程序入口与机器Schema仍待实现",
+      "issue": "最新分工为law.py加速度回调+队伍本地/指挥部正式固定推演；不采用旧JSON表达式或law内部predict积分。统一metadata、case、输出顺序和错误归类已实现",
       "impact": "无法直接编写稳定校验器，可能有巨大数组或隐藏对象列表以及覆盖已知初态的问题",
-      "minimum_resolution": "固定程序输入输出Schema与装载适配，输入只给必要初态/属性/时间，不传内部name/group标签或真实隐藏状态；保留三claims与既有五PARAMS/可选模型数据规则",
-      "status": "提交职责已确认；通用程序装载、冻结积分器调用约束和正式执行适配待实现"
+      "minimum_resolution": "law_api1.0、law_case.schema、公开loader/CLI/worker、配对冻结与私有评测桥已提供；格式预检不判科学正确性；完整服务/镜像仍需集成",
+      "status": "候选接口、格式和代表性数值/worker一致性已验证；远端生产运行未验收"
     },
     {
       "id": "A07",
@@ -131,7 +132,7 @@
       ],
       "issue": "公开物理时间采用0.005整数tick，t_launch、readout、observe时刻须网格对齐，只有浮点表示误差可容忍；相对偏移严格递增且可含0。各世界允许的空间/属性/最大物理时间仍需冻结",
       "impact": "影响请求校验、缓存、噪声重复测量、轨迹初态和同一积分器的一致性",
-      "minimum_resolution": "沿用整数tick校验与实际时刻返回；正式隐藏案例先统一预检，配置错误不归咎候选。现试做案例均合法，未来案例生成不得无校验rint后直接评分",
+      "minimum_resolution": "SDK与私有参考生成使用严格tick；参考shape/时间标签/V在候选执行前检查，非法官方配置不计队伍分。正式范围仍待冻结",
       "status": "用户确认保持numerics1.1严格网格；不采用任意时刻最近步吸附。SDK/真值/候选/拟合时刻须一致"
     },
     {
@@ -146,7 +147,8 @@
       ],
       "issue": "Yoshida当前代码正确处理子步时间，但未来新增速度依赖/不光滑作用不能自动宣称原阶数；幅值软化没有单独定义重合点方向。JAX真值引擎不能假定直接兼容任意NumPy/SciPy候选函数",
       "impact": "近源或长期误差可能主导成绩，候选执行路径可能需不同后端桥接及性能预算",
-      "minimum_resolution": "冻结公开和私有共享数值实现，真值做步长减半与边界测试；明确重合/逃逸/积分失败，先测Python候选路径实际成本。不能把指挥部真值失败算作队伍预测错误"
+      "minimum_resolution": "冻结公开和私有共享数值实现，真值做步长减半与边界测试；明确重合/逃逸/积分失败，先测Python候选路径实际成本。不能把指挥部真值失败算作队伍预测错误",
+      "status": "共享SDK与9宇宙54代表案例位置/速度逐位一致，9独立worker/JSON传输对照一致；不代表全域或任意候选收敛证明"
     },
     {
       "id": "A09",
@@ -259,10 +261,10 @@
     "验证案例预先固定，取消统一两倍距离及逐队从未使用属性组合承诺",
     "练习仅指挥部内部调试；参赛者开赛有效正式提交全部计榜",
     "正式九宇宙真值模拟器源码仅指挥部可见是硬约束",
-    "已选择可执行预测程序内调用固定积分器返回轨迹的正式提交方式",
     "非网格直接拒绝，统一规范时刻；不采纳最近步吸附替代方案",
     "各宇宙统一相对采样方式，按机制决定覆盖，不统一两倍距离",
-    "真实常数固定而不等于已公开；候选参数由攻坚组自行估计，指挥部不在隐藏测试上替其拟合"
+    "真实常数固定而不等于已公开；候选参数由攻坚组自行估计，指挥部不在隐藏测试上替其拟合",
+    "最新明确law.py只提供加速度，队伍本地拟合和指挥部正式驱动调用固定积分器；正式不交JSON数学表达式"
   ],
   "trial_status": {
     "private_core": "implemented",
@@ -272,6 +274,9 @@
     "actual_white_model_inference": "not_run_not_requested_this_round",
     "white_model_protocol_mock": "passed_not_a_capability_result",
     "final_numeric_ranges": "discussion_pending",
-    "program_submission_alignment": "旧闭源试做功能链一致；实际制品是JSON表达式经框架构造成预测对象，尚未验收任意程序文件提交/装载/调用约束"
+    "program_submission_alignment": "旧JSON式校准保留历史；新增正式law.py入口，指挥部owns积分。正式权限/控制台/榜单/远端仍待集成",
+    "formal_law_sdk": "implemented_and_tested_law_api_1.0.0",
+    "formal_law_worker": "implemented_known_truth_and_transport_regression_passed",
+    "paired_law_claims_store": "implemented_static_atomic_pair_checks_passed"
   }
 }

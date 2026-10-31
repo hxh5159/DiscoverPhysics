@@ -1,5 +1,5 @@
 {
-  "scoring_version": "draft-3.6.0",
+  "scoring_version": "draft-3.7.0",
   "updated": "2026-10-31",
   "implementation_status": "80预言/15定律/5节约的私有计分原型已实现且验证；公式、资格、反馈和完整最佳提交语义不变。采用多场景验证设计，具体案例/范围待冻结，正式服务与真实白名单模型能力尚未验收",
   "total_max_score": 100,
@@ -69,8 +69,9 @@
         "organizer_preflight": "所有隐藏案例进入候选执行前先做共同网格预检；无效指挥部配置不能作为队伍预测错误"
       }
     },
-    "candidate_execution_clarification": "评测端传入未提前公开的合法测试初态/属性/时刻，运行队伍提交的可执行预测程序；程序内部调用冻结官方积分器返回轨迹。候选参数由队伍在探索中确定，评分阶段不替队伍拟合；计分公式不变",
-    "observation_noise_relation": "评分V只用于预言误差归一化；探索位置噪声独立按observation_noise.json的公开投放域参考长度标定，验证真值仍无噪声"
+    "candidate_execution_clarification": "law.py提供已确定参数的acceleration(t,bodies,params)；指挥部固定驱动传入允许初态/时刻，调用冻结积分器得到预测轨迹。评分端不替队伍拟合、不信任队伍自带积分器或预计算轨迹",
+    "observation_noise_relation": "评分V只用于预言误差归一化；探索位置噪声独立按observation_noise.json的公开投放域参考长度标定，验证真值仍无噪声",
+    "organizer_reference_preflight": "候选执行前统一检查case、格点、共同采样方式、真值数组形状/有限性/实际时间标签及V；官方配置/存储/环境错误中止修复，不赋队伍P=0。候选计算错误沿既有无效预测政策处理"
   },
   "law": {
     "max_score": 15,
@@ -216,7 +217,9 @@
     "ranking_history_vs_scoring": "保存历史用于选择最佳成绩，不等于本次评分依赖历史；提交本身的评分与榜单最佳记录分开处理",
     "all_valid_competition_submissions_count": true,
     "participant_practice_submission_mode": false,
-    "competition_start_policy": "从比赛开始，每次有效正式提交都独立完整评测，结果进入在线榜单最佳完整成绩选择；低于历史最佳不替换最佳记录"
+    "competition_start_policy": "从比赛开始，每次有效正式提交都独立完整评测，结果进入在线榜单最佳完整成绩选择；低于历史最佳不替换最佳记录",
+    "law_api_version": "1.0.0",
+    "artifact_pair": "law.py与claims.json双方格式通过后配对冻结，同一快照源字节/声明校验；不混拼、不根据科学正确性做提交格式检查"
   },
   "evaluation_resources": {
     "owner": "指挥部",

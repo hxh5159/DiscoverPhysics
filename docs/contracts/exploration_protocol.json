@@ -1,8 +1,8 @@
 {
-  "protocol_version": "3.6.0",
+  "protocol_version": "3.7.0",
   "updated": "2026-10-31",
-  "implementation_status": "设计契约与已实现的指挥部私有带噪/配额试做控制台；公开SDK、正式隔离服务与真实白名单模型闭环尚未验收",
-  "revision_scope": "确认提交可执行预测程序，运行时接收未提前公开的测试初态与时刻，内部调用官方固定积分器返回轨迹；保留严格网格，统一采样方式并按机制校准范围。参数固定且由队伍自行估计，不修改力律/计分/配额",
+  "implementation_status": "候选law SDK、静态预检、独立固定积分worker及私有配对/计分桥已实现并测试；正式控制台/执行权限/榜单与远端镜像仍待集成验收",
+  "revision_scope": "按最新分工：law.py只提供候选加速度及参数，队伍本地推演与指挥部正式积分均调用公开固定rift.rollout；采用law_api1.0与严格输入/元数据预检，不使用JSON数学表达式作为正式制品",
   "scoring_contract": "scoring.json",
   "feedback_contract": "feedback.schema.json",
   "evaluation_feedback": {
@@ -34,7 +34,9 @@
       "配额余额、费用和调用/读数上限",
       "独立墙钟余量",
       "first_light",
-      "投放区域参考长度L_launch或可计算该长度的公开区域参数"
+      "投放区域参考长度L_launch或可计算该长度的公开区域参数",
+      "law_api_version",
+      "source_property_target_id（有源侧控制时的公开目标ID，无控制为null）"
     ],
     "task": {
       "goal": "主动实验并提出候选运动规律，提交加速度函数与结构化声明，由统一流程评价验证探针轨迹及规定分项",
@@ -181,11 +183,13 @@
   },
   "fitting": {
     "optimizer_owner": "参赛队",
-    "candidate_trajectory_provider": "官方公开本地rift.rollout模块，尚待实现",
+    "candidate_trajectory_provider": "已实现官方公开本地rift.rollout(law,case)，仅候选推演，不查询真实宇宙",
     "numerics_contract": "numerics.json",
     "candidate_rollout_queries_private_world": false,
     "candidate_rollout_energy_or_observe_charge": 0,
-    "candidate_rollout_uses_team_compute_and_wall_time": true
+    "candidate_rollout_uses_team_compute_and_wall_time": true,
+    "trajectory_integrator_requirement": "用候选加速度生成轨迹拟合/检验时调用此固定实现；无需积分的代数分析可自行选择方法",
+    "true_experiment_integration_owner": "控制台observe/launch的真实轨迹由指挥部私有模拟器积分，队伍不接触真实力场"
   },
   "submission": {
     "required_files": [
@@ -196,6 +200,7 @@
     "scientific_claim_field_count": 3,
     "claims_schema_version": "4.0.0",
     "law_math_libraries": [
+      "math",
       "numpy",
       "scipy"
     ],
@@ -223,8 +228,8 @@
     "prediction_program": {
       "selected": true,
       "artifact": "law.py",
-      "mode": "executable_predictor_using_frozen_integrator",
-      "runtime_owner": "指挥部正式评测环境运行攻坚组提交的预测程序",
+      "mode": "acceleration_callback_with_organizer_owned_fixed_rollout",
+      "runtime_owner": "指挥部独立候选worker加载最终law.py，由官方驱动统一调用固定积分器",
       "runtime_input": "未提前公开的验证探针初态、公开属性/实验设置、合法投放时刻和相对采样时刻，以及允许使用的可见背景t=0初态",
       "input_exclusions": [
         "真实未来轨迹",
@@ -232,14 +237,21 @@
         "评分分组/机制标签",
         "内部案例名称及其他评分元数据"
       ],
-      "runtime_output": "对应指定采样时刻的二维探针预测位置；精确字段与数组接口随SDK冻结",
-      "official_integrator_must_be_called": true,
-      "integrator_provider": "指挥部运行环境提供并锁定可信冻结实现；与攻坚组开发使用的公开版本一致",
+      "runtime_output": "law.py回调返回与bodies等长的(N_body,2)加速度；官方驱动输出(T,N_probe,2)位置/速度，评分只用探针位置",
+      "integrator_provider": "官方驱动调用冻结rift.rollout；law.py不提供predict或积分器，也不得导入/替换积分器",
       "raw_precomputed_trajectory_file_submission": false,
-      "entrypoint_schema_status": "已确定职责与流程；通用预测程序的正式函数签名、装载及执行适配尚待实现",
+      "entrypoint_schema_status": "law_api1.0.0已实现acceleration(t,bodies,params)、canonical case、格式预检和固定推演；正式服务/镜像仍待验收",
       "known_inputs_must_not_be_overridden": true,
-      "parameter_fitting_owner": "攻坚组用允许观测自行拟合或估计；最终程序携带确定的候选参数。指挥部不使用隐藏测试真值替队伍拟合"
-    }
+      "parameter_fitting_owner": "攻坚组用允许观测自行拟合或估计；最终程序携带确定的候选参数。指挥部不使用隐藏测试真值替队伍拟合",
+      "official_integrator_must_be_called_by": "队伍本地轨迹推演代码及指挥部正式驱动，不是law.py回调自身",
+      "law_api_contract": "law_api.json",
+      "case_schema": "law_case.schema.json",
+      "entrypoint": "def acceleration(t,bodies,params)",
+      "law_calls_integrator": false,
+      "official_driver_calls_fixed_integrator": true,
+      "local_candidate_rollout_uses_fixed_integrator": true
+    },
+    "law_api_version": "1.0.0"
   },
   "common_claim_semantics": {
     "dynamics_order": "1表示作用决定速度，2表示作用决定加速度；当前候选接口仍返回加速度，声明1不自动获得另一套执行接口",
@@ -361,12 +373,12 @@
   },
   "candidate_prediction_review": {
     "scientific_scoring_inputs_unchanged": "既有候选规律生成的验证轨迹、三个claims及实验能量账本；不新增科学评分项",
-    "meaning_of_candidate_execution": "指挥部调用提交的预测程序并传入本次隐藏验证初态与采样时刻；程序用自身发现的加速度及参数调用固定积分器，返回轨迹后按原规则计分",
+    "meaning_of_candidate_execution": "指挥部将允许测试输入交给固定推演驱动；驱动在积分中反复调用law.py的acceleration(t,bodies,params)，生成探针轨迹后按原规则计分",
     "fitting_vs_integration": "参数拟合由攻坚组使用公开观测自行完成；预测阶段冻结候选参数并积分求轨迹，指挥部不在隐藏测试上自动替队伍拟合",
-    "public_integrator": "通用程序只含冻结数值算法与接口，以攻坚组提供的加速度为输入，不含正式九宇宙真值力场",
+    "public_integrator": "公开rift.rollout及rift_numerics仅通用数值与输入适配，不含正式真实力场。真实实验积分仍属私有控制台",
     "optional_metadata": "BODY_PROPS/HIDDEN是既有可选候选表示，不属于claims，不要求为评分新增人工填写项目；可采用接口允许的等价代码表示",
     "raw_trajectory_upload": "不采用仅上传预先计算轨迹；未提前公开的测试初始条件只在程序运行时传入，不包含真实隐藏源或未来真值",
-    "selected_team_integration": "已由用户确认：队伍提交可执行预测程序，指挥部正式运行时由该程序调用官方冻结积分器返回轨迹；开发拟合也可调用同版公开积分器"
+    "selected_team_integration": "用户最新明确：探索/拟合阶段队伍调用提供的固定积分器；最终law.py只交候选加速度和参数，由指挥部调用同一固定积分器，不要求law.py内部积分或返回最终轨迹"
   },
   "private_simulator_boundary": {
     "hard_constraint": true,
