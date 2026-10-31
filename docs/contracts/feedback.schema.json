@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:discoverphysics:feedback:1.0.0",
+  "title": "参赛者成绩反馈格式契约",
+  "description": "只公开总分和九宇宙合计分，不允许附带分项、逐声明正确性、误差、评分日志或内部真值。总分须由各宇宙分数按既定档位权重计算；该算术关系由反馈生成端核对，JSON Schema只校验形状与数值范围。",
+  "x-contract-version": "1.0.0",
+  "x-number-policy": "使用标准JSON有限数值；生成端禁止NaN/Infinity，不通过显示舍入改变内部排名和节约资格判断。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "total_score",
+    "world_scores"
+  ],
+  "properties": {
+    "total_score": {
+      "description": "按一级30%、二级40%、三级30%汇总的总分，各档内三宇宙等权。",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "world_scores": {
+      "description": "每宇宙只报告预言、定律与节约相加后的总分。",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Adam",
+        "Lilith",
+        "Tabris",
+        "Sachiel",
+        "Ramiel",
+        "Matriel",
+        "Leliel",
+        "Arael",
+        "Lilin"
+      ],
+      "properties": {
+        "Adam": { "$ref": "#/$defs/world_score" },
+        "Lilith": { "$ref": "#/$defs/world_score" },
+        "Tabris": { "$ref": "#/$defs/world_score" },
+        "Sachiel": { "$ref": "#/$defs/world_score" },
+        "Ramiel": { "$ref": "#/$defs/world_score" },
+        "Matriel": { "$ref": "#/$defs/world_score" },
+        "Leliel": { "$ref": "#/$defs/world_score" },
+        "Arael": { "$ref": "#/$defs/world_score" },
+        "Lilin": { "$ref": "#/$defs/world_score" }
+      }
+    }
+  },
+  "$defs": {
+    "world_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    }
+  }
+}

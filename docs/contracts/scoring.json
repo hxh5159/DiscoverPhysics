@@ -1,0 +1,229 @@
+{
+  "scoring_version": "draft-3.6.0",
+  "updated": "2026-10-31",
+  "implementation_status": "80预言/15定律/5节约的私有计分原型已实现且验证；公式、资格、反馈和完整最佳提交语义不变。采用多场景验证设计，具体案例/范围待冻结，正式服务与真实白名单模型能力尚未验收",
+  "total_max_score": 100,
+  "prediction": {
+    "max_score": 80,
+    "error_symbol": "e",
+    "error_definition": "e=MSE/max(V,1e-12)。MSE为每个探针每个测试时刻的二维位置平方欧氏距离，再对探针与时刻等权平均；不是欧氏距离平均或RMSE，也不额外除以二维坐标数2",
+    "sample_definition": "N>=20枚预先固定的隐藏验证探针；各验证案例有T个预定相对采样偏移，绝对物理时刻为t_launch+readout。T是采样数量，非时间长度；不同案例可有不同物理跨度。所有N*T条二维位置记录等权，不按坐标额外除2",
+    "mse_formula": "MSE=(1/(N*T))*sum_{i=1..N,k=1..T}[(xhat_ik-xstar_ik)^2+(yhat_ik-ystar_ik)^2]",
+    "true_position_mean_formula": "rbar=(1/(N*T))*sum_{i,k}rstar_ik",
+    "variance_formula": "V=(1/(N*T))*sum_{i,k}||rstar_ik-rbar||_2^2",
+    "variance_definition": "同一宇宙本次固定验证集全部N*T个无噪声真值位置，相对总体二维位置均值的平方欧氏距离均值；包含两坐标方差之和，不使用观测噪声或提交结果估计V",
+    "variance_floor": 1e-12,
+    "normalization_formula": "e=MSE/max(V,1e-12)",
+    "mapping": "P=80/(1+10*e)，e>=0",
+    "mapping_scale": 10,
+    "calibration_status": "尺度10与globalV沿用；新覆盖已压低本轮匀速基线，数值候选库闭环及对照已运行，分场景e未采用，真实白名单LLM与训练改进仍未测",
+    "zero_error_policy": "e=0得80；任意有限e>0严格低于80且高于0，误差增大时连续降低并趋近0，不设置满分平台、分档或固定误差零分阈值",
+    "invalid_prediction_policy": "预测形状不符、缺失测试样本、含NaN/Inf、积分失败、执行超时或报错时本宇宙预言分为0；不丢弃失败探针或失败时刻后重新平均。计算溢出使误差非有限时预言分为0",
+    "rounding_policy": "按未显示舍入的数值计分、汇总并判断节约资格；显示时的舍入不产生计分档位",
+    "examples": [
+      {
+        "e": 0.0,
+        "score": 80
+      },
+      {
+        "e": 0.01,
+        "score": 72.72727272727272
+      },
+      {
+        "e": 0.1,
+        "score": 40
+      },
+      {
+        "e": 1.0,
+        "score": 7.2727272727272725
+      }
+    ],
+    "reference_truth_has_observation_noise": false,
+    "objective_scope": "同宇宙的验证集、采样和V固定时，此严格递减映射保持位置MSE排序；跨宇宙公平性取决于测试覆盖、归一化与尺度校准，公式本身不构成验收",
+    "pending_calibration_checks": [
+      "检查静止预测和匀速外推基线，避免V由不同探针初始位置的分散主导而给高分",
+      "检查数值积分稳定性、远期离群误差与统一采样权重",
+      "比较基础策略、改进策略和真值候选的分数分布，校准尺度10；本轮不修改现公式或V"
+    ],
+    "validation_design": {
+      "status": "多场景验证设计已采用；私有试做案例已通过有限数值收敛检查，正式范围及案例待讨论后冻结",
+      "same_for_all_teams": true,
+      "depends_on_team_exploration_history": false,
+      "world_constants": "同命名宇宙固定真实定律常数，所有攻坚组相同",
+      "cases": "每宇宙预先固定至少20枚验证探针；分布于多个初态、速度、允许属性及投放时刻配置。每个案例使用预定T个相对采样偏移，绝对时刻=t_launch+readout；不同案例可按物理跨度采用不同偏移，但采样数和记录权重按评分契约统一",
+      "hidden_meaning": "不向参赛者提供验证案例清单和对应轨迹真值，不承诺每个属性值或组合从未被任何队伍探索",
+      "blanket_two_times_launch_distance": false,
+      "spatial_temporal_coverage": "部分案例可在可探索域内；确有必要时增加更广空间或更长时域，但按世界机制与稳定性校准，不统一强制两倍距离或每宇宙域外测试",
+      "calibration": "先检查真值与候选积分收敛、匀速/错核/省略机制基线，再做有限配额带噪闭环；保留现MSE/globalV与80/(1+10e)，分场景归一化仍仅作对照",
+      "online_final_relationship": "共同测试指同一评测阶段各队一致；在线榜与终评是否复用完全同一案例集尚未由用户指定，不自行新增一套宇宙",
+      "coverage_quality": "覆盖使候选规律可被辨别的空间与时间变化，避免只用极短窗、狭窄距离、近匀速弱作用或单一运动形态；具体选择仅指挥部内部保存，不公开逐宇宙机制标签",
+      "numeric_boundaries_and_disclosure": "用户明确等待讨论完成后再冻结；本轮试做区域和样例不是对参赛者的最终范围承诺",
+      "shared_time_schedule": {
+        "same_rule_across_worlds": true,
+        "common_sample_count_T": true,
+        "relative_offsets": "tau_k=k*D/T，k=1..T；各案例在同一相对比例上等间隔采样",
+        "absolute_times": "t_abs=t_launch+tau_k，launch和offset先转合法整数tick后相加",
+        "grid_construction": "用合法整数tick构造；跨度D选择为T个网格步间隔的整数倍，不把非网格值取最近点",
+        "world_specific": "投放时刻、轨迹跨度D和空间/属性覆盖按机制和稳定性校准，不要求所有宇宙使用相同绝对时间数值",
+        "trial_status": "此前试做全部T=20且遵循本方式；正式T、D、起始时刻与公开粒度仍待冻结",
+        "organizer_preflight": "所有隐藏案例进入候选执行前先做共同网格预检；无效指挥部配置不能作为队伍预测错误"
+      }
+    },
+    "candidate_execution_clarification": "评测端传入未提前公开的合法测试初态/属性/时刻，运行队伍提交的可执行预测程序；程序内部调用冻结官方积分器返回轨迹。候选参数由队伍在探索中确定，评分阶段不替队伍拟合；计分公式不变",
+    "observation_noise_relation": "评分V只用于预言误差归一化；探索位置噪声独立按observation_noise.json的公开投放域参考长度标定，验证真值仍无噪声"
+  },
+  "law": {
+    "max_score": 15,
+    "claims_schema_version": "4.0.0",
+    "scientific_claim_field_count": 3,
+    "fields": {
+      "dynamics_order": {
+        "max_score": 5,
+        "matching": "规范化后的整数与真值相同得5，否则0"
+      },
+      "hidden_matter": {
+        "max_score": 5,
+        "matching": "布尔值与真值相同得5，否则0"
+      },
+      "time_dependence": {
+        "max_score": 5,
+        "matching": "规范化布尔值与真值相同得5，否则0；不区分显式变化的具体形式"
+      }
+    },
+    "mapping": "各字段匹配分相加；不存在旧数值字段的15%-50%相对误差规则",
+    "excludes": "不对已删除的指数、特征尺度、具体周期、背景参数或属性标度另计声明分",
+    "matching_method": "对结构化值与预存真值做确定性匹配，不使用LLM裁判"
+  },
+  "consistency": {
+    "enabled": false,
+    "counted_in_total": false,
+    "max_score_in_total": 0,
+    "status": "用户已取消独立自洽评分；不再为候选源码与科学声明的一致性另设得分或扣分。格式与执行合法性仍按提交契约检查。"
+  },
+  "saving": {
+    "enabled": true,
+    "counted_in_total": true,
+    "max_score": 5,
+    "basis": "仅计本宇宙100点实验能量的剩余比例；现实墙钟与模拟物理时间均不参与节约分，免费observe的剩余次数也不折算本项",
+    "energy_budget": 100,
+    "energy_used_definition": "本宇宙已计费的有效实验能量，以控制台账本为准；当前每枚主动新探针1点，第一束光和免费观测不扣能量",
+    "eligibility": "prediction>=40",
+    "eligibility_comparison": "按未作显示舍入的本次预言分比较，40分包含在内；与定律分无关，不再要求law==15或prediction+law>20",
+    "mapping": "prediction>=40时5*(1-energy_used/100)，否则0",
+    "energy_used_domain": [
+      0,
+      100
+    ],
+    "time_used": false,
+    "observe_call_remainder_used": false,
+    "examples": [
+      {
+        "prediction": 39.99,
+        "law": 15,
+        "energy_used": 40,
+        "saving_score": 0
+      },
+      {
+        "prediction": 40,
+        "law": 0,
+        "energy_used": 40,
+        "saving_score": 3
+      },
+      {
+        "prediction": 80,
+        "law": 15,
+        "energy_used": 100,
+        "saving_score": 0
+      }
+    ]
+  },
+  "total_mapping": "prediction+law+saving",
+  "feedback": {
+    "schema_file": "feedback.schema.json",
+    "schema_version": "1.0.0",
+    "participant_visible_fields": [
+      "total_score",
+      "world_scores"
+    ],
+    "total_score": "九宇宙总分按既定档位权重汇总的加权均分，范围0到100",
+    "world_scores": "以九个公开宇宙名称为键的对象，每个值只给该宇宙prediction+law+saving的合计，范围0到100",
+    "participant_hidden": [
+      "预言、定律和节约分项及其单独状态",
+      "三个声明逐项匹配结果、正确答案或科学正确性提示",
+      "定律满分或节约资格的布尔标志",
+      "原始MSE、归一化误差e、真值方差V及测试轨迹真值",
+      "评分诊断日志、推演残差图、内部评测文件及其下载入口",
+      "用于同分比较的内部统计明细"
+    ],
+    "applies_to": "参与者可见的成绩API、榜单成绩详情、下载结果及评测反馈日志，不能从旁路返回被隐藏项目",
+    "internal_audit": "指挥部内部保留完整分项、匹配结果、账本和评分诊断供复核；不得以此生成参与者可访问的附件或链接",
+    "format_precheck": "公开格式检查仍可说明字段缺失、类型或接口错误，但不得读取真值给出科学正确与否的提示",
+    "information_leakage_limit": "隐藏分项降低直接暴露程度，但仍可能利用多次独立提交的宇宙总分差异反推声明；用户已知悉并决定暂维持此反馈设计。节约门槛现为prediction>=40，不再由定律满分触发",
+    "scope_limit": "用户接受目前只反馈总分和每宇宙总分的缓解方案；不声称已完全消除由总分差异反推声明的可能，本轮不再新增防护或限次规则"
+  },
+  "unchanged": {
+    "tier_weights": [
+      0.3,
+      0.4,
+      0.3
+    ],
+    "worlds_per_tier": 3,
+    "parameter_limit": 5,
+    "numerics_version": "1.1",
+    "exploration_budget_reference": "exploration_protocol.json",
+    "ranking": "加权总分较高者优先；总分完全相同仅比较精确分层bootstrap的95%区间宽度，较小者优先，宽度也相同则并列。不再按总自由度排序"
+  },
+  "ready_for_ranking": false,
+  "ranking": {
+    "primary": "未作显示舍入的加权总分降序",
+    "only_tiebreak": "95%精确分层bootstrap百分位区间长度升序",
+    "method": "每档三个已得宇宙总分，有放回抽取三个；穷举每档27个等概率有序样本及三档联合19683个样本，保留重复值的出现次数",
+    "tier_weights": [
+      0.3,
+      0.4,
+      0.3
+    ],
+    "worlds_per_tier": 3,
+    "ordered_samples_per_tier": 27,
+    "total_resamples": 19683,
+    "resampled_score": "0.3*mean(tier1_resample)+0.4*mean(tier2_resample)+0.3*mean(tier3_resample)",
+    "percentiles": [
+      0.025,
+      0.975
+    ],
+    "percentile_method": "linear：对排序后n个数，h=(n-1)*q，在floor(h)与ceil(h)之间线性插值",
+    "width": "upper-lower",
+    "input": "仅已有九个宇宙总分，按固定三档顺序；不重跑智能体、不生成新轨迹、不发起额外真实实验",
+    "sampling_randomness": "穷举全部有限样本，不使用随机数或随机种子，无Monte Carlo抽样误差",
+    "compute_when": "只有主总分相同需要此项时计算，或作为内部缓存预先计算",
+    "remaining_tie": "并列，不增加第三顺位",
+    "total_dof_used": false,
+    "parameter_cap_unchanged": 5,
+    "interpretation": "既有宇宙得分的重采样稳定性指标，不等于重新运行智能体得到的随机性，也不保证固定九宇宙之外的95%覆盖率",
+    "visibility": "内部用于同分排序，公开反馈仍仅总分及各宇宙总分"
+  },
+  "submission_evaluation": {
+    "each_submission_is_independent": true,
+    "complete_scoring_per_submission": true,
+    "previous_submission_used_as_scoring_input": false,
+    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价九宇宙；不读取历史提交来补全本次结果或调整本次分数",
+    "new_submission_may_differ": "参赛队可反复改进并提交；不同次运行或随机探索不要求产生相同结果，不把独立新提交当作对旧提交的复算",
+    "best_result_scope": "在线榜单和最终结算均选取同一攻坚组有效完整提交中加权总分最高的一次；其各宇宙分数须来自该同一次完整提交",
+    "per_world_historical_best_stitching_allowed": false,
+    "no_valid_submission_by_deadline_score": 0,
+    "no_submission_definition": "到提交截止时间仍没有一次有效正式提交，记0分；不是自动从开发目录选择草稿或旧发现文件",
+    "pending_evaluation_or_service_failure_policy": "截止前已提交但评测尚未完成、以及指挥部服务失败的处理本轮不自行确定，后续需要时再明确",
+    "ranking_history_vs_scoring": "保存历史用于选择最佳成绩，不等于本次评分依赖历史；提交本身的评分与榜单最佳记录分开处理",
+    "all_valid_competition_submissions_count": true,
+    "participant_practice_submission_mode": false,
+    "competition_start_policy": "从比赛开始，每次有效正式提交都独立完整评测，结果进入在线榜单最佳完整成绩选择；低于历史最佳不替换最佳记录"
+  },
+  "evaluation_resources": {
+    "owner": "指挥部",
+    "location": "指挥部评测端",
+    "uniform_per_evaluation_gpu_allocation": "4×H200，沿用既定统一硬件条件",
+    "shares_team_training_gpus": false,
+    "blocks_team_normal_training": false,
+    "description": "正式评测使用指挥部独立资源，不占用攻坚组用于开发和训练的四卡；指挥部队列容量和通常反馈耗时仍需工程测量"
+  }
+}

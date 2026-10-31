@@ -1,0 +1,386 @@
+{
+  "protocol_version": "3.6.0",
+  "updated": "2026-10-31",
+  "implementation_status": "设计契约与已实现的指挥部私有带噪/配额试做控制台；公开SDK、正式隔离服务与真实白名单模型闭环尚未验收",
+  "revision_scope": "确认提交可执行预测程序，运行时接收未提前公开的测试初态与时刻，内部调用官方固定积分器返回轨迹；保留严格网格，统一采样方式并按机制校准范围。参数固定且由队伍自行估计，不修改力律/计分/配额",
+  "scoring_contract": "scoring.json",
+  "feedback_contract": "feedback.schema.json",
+  "evaluation_feedback": {
+    "participant_visible": "仅total_score与world_scores；后者只含每宇宙合计分，不含预言/定律/节约分项",
+    "truth_dependent_feedback": "不得返回逐声明正确性、真值、定律满分标志、节约资格或评分残差等侧面诊断",
+    "internal_details": "完整分项与评分日志仅指挥部内部留存，不进入参与者成绩响应、下载或日志",
+    "format_validation": "格式和接口预检只检查公开约束，不根据隐藏真值报科学错误",
+    "scope_limit": "用户已知悉总分差分反推的残余风险，决定暂保持仅总分及各宇宙总分；不新增防护或提交次数限制"
+  },
+  "mission": {
+    "first_success_creates_session": true,
+    "repeat_call_resets_clock_or_budget": false,
+    "returns": [
+      "world_id",
+      "session_id",
+      "protocol_version",
+      "claims_schema_version",
+      "numerics_version",
+      "task",
+      "topology",
+      "二维坐标与无量纲单位约定",
+      "可见背景数量、ID与可控对象",
+      "全体可见背景t=0的干净位置、速度及仅已公开的属性",
+      "可控标量或质量目录、范围、默认值与已知含义",
+      "投放区",
+      "v_max",
+      "允许投放与观测的绝对物理时间范围",
+      "请求与返回格式、字段含义及已公开的噪声规则",
+      "配额余额、费用和调用/读数上限",
+      "独立墙钟余量",
+      "first_light",
+      "投放区域参考长度L_launch或可计算该长度的公开区域参数"
+    ],
+    "task": {
+      "goal": "主动实验并提出候选运动规律，提交加速度函数与结构化声明，由统一流程评价验证探针轨迹及规定分项",
+      "goal_is_distinct_from_operable_structure": true
+    },
+    "topology": {
+      "visible_background": "公开数量、稳定ID及已知t0初态；不提供真实隐藏对象数量、位置或未知源强。kind=visible仅表示可见，不标记真实作用角色",
+      "controllable_objects": "可投放的被动探针，以及本世界目录明确允许的源侧属性",
+      "probe_motion": "自由运动；pos和vel是在t_launch时的初态，不是钉住的位置或全程速度约束",
+      "max_probes_per_launch": 8,
+      "request_fields": "按launch_request给出顶层及每探针字段、类型、范围与含义",
+      "observation_fields": "按readout_semantics说明探针状态与全体可见背景帧的含义"
+    },
+    "launch_region_policy": "公开连续二维合法区域供队伍自主选坐标，不限于第一束光或参考检查的几个预设点；区域须覆盖辨认规律所需的空间尺度，具体边界按世界试做冻结",
+    "private_properties_not_returned": [
+      "未公开的真实源强",
+      "真实物种标签",
+      "隐藏源数量",
+      "隐藏天体状态"
+    ],
+    "clean_initial_state_policy": "统一提供可见背景在共同物理t=0的干净位置和速度，作为已知初始条件；仅提供本世界公开目录中已知的属性。原始控制p1/p2不自动揭示其源/响应/惯性映射，不提供真实隐藏源状态或未公开属性；后续位置观测仍按既定规则加噪。"
+  },
+  "time_model": {
+    "physical_origin": "整局为本宇宙定义同一个物理t=0及固定背景初态，不按每次调用重置原点",
+    "background_replay": "observe与launch按所请求的绝对物理时刻查询或重放同一背景B(t)",
+    "observe_time_basis": "绝对物理时刻t",
+    "probe_readout_time_basis": "相对投放时刻的readout；absolute_time=t_launch+readout",
+    "thinking_or_call_order_advances_physical_time": false,
+    "launch_resets_background_phase": false,
+    "source_property_interventions": "按本世界公开目录解释source_properties；当前定义允许的源侧干预不改变背景位置/速度轨迹，因此observe(times)查询唯一背景，不由最近一次launch隐式切换配置。若后续改场使源侧属性影响背景，须同时修订接口，不能混用配置数据 背景几何相同不等于源属性值被忽略：本次launch或验证案例选定的source_properties仍须进入候选输入，并随探针数据记录。",
+    "wall_clock_is_independent": true,
+    "wall_clock_start": "本宇宙第一次成功mission调用创建会话时",
+    "wall_clock_seconds": 3600,
+    "wall_clock_definition": "从本宇宙第一次成功mission建立会话起累计的现实经过时间，不是日期钟点，不是模拟物理t，也不是48小时实训开发窗口",
+    "absolute_physical_time_definition": "t_launch等绝对物理时刻相对于本宇宙统一t=0；readout为相对投放偏移，与现实墙钟无换算关系",
+    "time_used_for_saving_score": false,
+    "guardrail_policy": {
+      "purpose": "时间限制主要是宽松的资源护栏，防止无限时间窗口或极端长模拟请求，不以人为紧缩时间作为主要难点",
+      "limits_public_and_uniform": true,
+      "time_requests_must_be_finite_and_within_public_bounds": true,
+      "validate_before_simulation": true,
+      "calibration": "联合检查正常推理/拟合策略所需墙钟余量，以及覆盖机制所需的物理时域/单轨迹跨度与服务计算成本；现有试做数值不因本轮讨论自动改动"
+    },
+    "background_vs_observation_noise": "同配置同物理时刻的背景真状态一致；另行重复真实观测仍按既定规则独立抽噪声，读取第一束光或archive缓存不重抽",
+    "pending_calibration_or_implementation": [
+      "各世界允许的最大物理时刻与单条轨迹最大跨度",
+      "SDK整数tick校验及实际时刻返回的代码实现",
+      "背景重放及控制台/SDK实现；当前定义无需额外背景配置ID"
+    ],
+    "input_time_policy": "所有公开物理时间输入按0.005网格；SDK仅容忍浮点表示误差后转整数tick，不把任意非网格时间静默吸附到最近网格",
+    "time_tick": {
+      "step": 0.005,
+      "canonical_unit": "整数tick",
+      "alignment_tolerance_ticks": 1e-09,
+      "tolerance_purpose": "只容忍浮点数表示造成的微小偏差；超过容差的非网格时间返回公开格式/范围错误",
+      "t_launch": "有限、非负、网格对齐的绝对物理时刻，相对于整局t=0",
+      "readout": "有限、非负、网格对齐的相对物理时间偏移；严格递增，可从0开始，每批最多50个",
+      "observe_times": "每项为有限、非负、网格对齐的绝对物理时刻，仍每次最多50个",
+      "absolute_sample_tick": "launch_tick + readout_tick，先各自合法转换为整数tick后再相加，不再分别静默round请求值",
+      "returned_times": "返回规范化的实际投放时刻和实际采样时刻，均可由整数tick×0.005精确指定",
+      "shared_batch_schedule": true
+    },
+    "confirmed_strict_grid_policy": "接受对齐0.005网格的合法物理时刻；只容忍浮点表示误差，非网格直接拒绝。SDK/执行端统一整数tick，返回实际规范时刻；真值、候选和拟合使用相同标签，不采用任意时刻的最近步吸附"
+  },
+  "first_light": {
+    "status": "用户确认的暂定基线，允许试做后赛前统一调整",
+    "standard_probe_count": 2,
+    "properties": "使用本宇宙公开目录的默认源侧和探针属性；两个标准探针使用相同属性值",
+    "readouts_per_probe": 8,
+    "background_snapshot_count": 8,
+    "background_times_match_probe_absolute_times": true,
+    "background_returns": [
+      "可见天体位置"
+    ],
+    "probe_returns": [
+      "位置",
+      "速度"
+    ],
+    "known_inputs_returned": [
+      "source_properties",
+      "properties",
+      "pos",
+      "vel",
+      "t_launch",
+      "readout",
+      "absolute_readout_times"
+    ],
+    "position_noise": "沿用observation_noise.json：sigma=.01*L_launch；逐坐标独立高斯，生成一次缓存",
+    "probe_velocity_noise": "不额外加噪声",
+    "energy_charge": 0,
+    "observe_call_charge": 0,
+    "generated_once_per_session": true,
+    "repeat_mission_or_archive": "返回同一缓存数据，不重新抽噪声",
+    "placement_and_time_window": "按宇宙试做校准并赛前冻结；不在初始包做完整属性或距离扫描"
+  },
+  "launch_request": {
+    "root_type": "object",
+    "shared_fields": [
+      "t_launch",
+      "readout",
+      "source_properties"
+    ],
+    "probes_array_items": [
+      "properties",
+      "pos",
+      "vel"
+    ],
+    "source_properties": "仅本宇宙公开目录允许的源侧标量键（如p1），无此控制时为{}",
+    "probe_properties": "仅本宇宙公开目录允许的标量（如p2）或真实惯性质量mass，无此控制时为{}",
+    "semantics": "数组每项是共享顶层时间安排及源侧控制的一枚探针；不同顶层安排采用不同调用，不是DP独立完整实验对象的数组",
+    "readout_time_basis": "readout为相对投放时间；absolute_time=t_launch+readout",
+    "law_constant_policy": "可控粒子属性属于实验输入；定律常数按当前决定保持固定，不随调用、提交或重新运行重抽",
+    "max_probes": 8,
+    "max_readouts_per_probe": 50,
+    "time_grid_policy": "t_launch与readout均须满足time_model.time_tick；相对偏移严格递增且可含0"
+  },
+  "probe_model": {
+    "passive": "不相互作用，也不扰动背景；不等于静止或不受力",
+    "motion": "以pos和vel为投放初态，在真实作用下连续运动，读数时刻只决定哪些状态被返回",
+    "continuous_force_evaluation": "内部积分按官方数值契约计算受力，不以公开返回的50个采样时刻替代内部积分步或冻结背景",
+    "launch_region": "只限制投放初始位置，不自动构成后续运动边界",
+    "additional_controls_this_revision": "未新增暂停、既有探针追加读取、中途控制或新的收费操作；gauge仍停用"
+  },
+  "readout_semantics": {
+    "probe_sample": "一枚探针在一个采样时刻的位置和速度合成一条状态；不按坐标、标量或pos/vel分别计次",
+    "max_samples_per_probe": 50,
+    "max_probe_states_per_full_launch": 400,
+    "full_launch_count_basis": "8枚探针各50个时刻，共8×50=400条探针状态",
+    "observe_frame": "一个绝对物理时刻的全体可见背景位置；不是每个天体单独消耗一个时刻",
+    "max_frames_per_observe": 50,
+    "observation_times_vs_physical_motion": "离散返回读数不把实际运动或受力变为离散投放点间跳转",
+    "calibration_required": "可识别性取决于可达物理时域、轨迹跨度、时刻分布、初始位置/速度域、实际经过的空间尺度与噪声，不能仅凭探针移动类别或采样上限判断难度",
+    "grid_time_policy": "使用公开网格上的时刻；读数数量仍不等于积分内部加速度求值次数，缓存重读不重抽噪声"
+  },
+  "exploration_limits": {
+    "current_working_scheme": "A",
+    "alternative_B": "保留原有备选，未叠加固定LLM轮数限制",
+    "energy": 100,
+    "energy_per_new_probe": 1,
+    "observe_calls": 20,
+    "max_times_per_observe": 50,
+    "wall_clock_seconds": 3600,
+    "gauge_enabled": false
+  },
+  "fitting": {
+    "optimizer_owner": "参赛队",
+    "candidate_trajectory_provider": "官方公开本地rift.rollout模块，尚待实现",
+    "numerics_contract": "numerics.json",
+    "candidate_rollout_queries_private_world": false,
+    "candidate_rollout_energy_or_observe_charge": 0,
+    "candidate_rollout_uses_team_compute_and_wall_time": true
+  },
+  "submission": {
+    "required_files": [
+      "law.py",
+      "claims.json"
+    ],
+    "optional_file": "report.md",
+    "scientific_claim_field_count": 3,
+    "claims_schema_version": "4.0.0",
+    "law_math_libraries": [
+      "numpy",
+      "scipy"
+    ],
+    "law_execution_policy": {
+      "deterministic": true,
+      "side_effect_free": true,
+      "file_io_allowed": false,
+      "network_io_allowed": false,
+      "math_library_permission": "允许NumPy与SciPy的数学计算，不再仅开放scipy.special.k1；库许可不等于允许读写文件、联网或依赖外部可变状态",
+      "official_numerics_unchanged": true
+    },
+    "schema_file": "claims.schema.json",
+    "schema_version_source": "mission与Schema元数据，不新增科学计分字段",
+    "validation_scope": "公开结构/类型/接口约束，不读取隐藏真值判断科学正确性",
+    "save_and_submit_validate_first": true,
+    "atomic_law_claims_pair": true,
+    "invalid_submission_preserves_last_valid_draft": true,
+    "invalid_submission_ends_exploration": false,
+    "parameter_count_policy": {
+      "PARAMS_max": 5,
+      "BODY_PROPS_HIDDEN_exempt_from_cap": true,
+      "total_dof_ranking": false,
+      "scope": "保留PARAMS最多五个的模型简约约束，不再为同分排名统计或审查总自由度"
+    },
+    "prediction_program": {
+      "selected": true,
+      "artifact": "law.py",
+      "mode": "executable_predictor_using_frozen_integrator",
+      "runtime_owner": "指挥部正式评测环境运行攻坚组提交的预测程序",
+      "runtime_input": "未提前公开的验证探针初态、公开属性/实验设置、合法投放时刻和相对采样时刻，以及允许使用的可见背景t=0初态",
+      "input_exclusions": [
+        "真实未来轨迹",
+        "真实隐藏源状态或未知源强",
+        "评分分组/机制标签",
+        "内部案例名称及其他评分元数据"
+      ],
+      "runtime_output": "对应指定采样时刻的二维探针预测位置；精确字段与数组接口随SDK冻结",
+      "official_integrator_must_be_called": true,
+      "integrator_provider": "指挥部运行环境提供并锁定可信冻结实现；与攻坚组开发使用的公开版本一致",
+      "raw_precomputed_trajectory_file_submission": false,
+      "entrypoint_schema_status": "已确定职责与流程；通用预测程序的正式函数签名、装载及执行适配尚待实现",
+      "known_inputs_must_not_be_overridden": true,
+      "parameter_fitting_owner": "攻坚组用允许观测自行拟合或估计；最终程序携带确定的候选参数。指挥部不使用隐藏测试真值替队伍拟合"
+    }
+  },
+  "common_claim_semantics": {
+    "dynamics_order": "1表示作用决定速度，2表示作用决定加速度；当前候选接口仍返回加速度，声明1不自动获得另一套执行接口",
+    "hidden_matter": "是否存在位置未由观测接口提供的物理作用源；不表示可见天体属性未知，也不按数学等价表示自动推断",
+    "time_dependence": {
+      "type": "boolean",
+      "false": "固定完整瞬时状态和属性后，作用无显式物理时间依赖",
+      "true": "固定完整瞬时状态和属性后，作用有显式物理时间依赖",
+      "scope": "只判断有无，不细分变化形式；不能把轨迹或几何状态随时间变化直接当成作用规律的显式时间依赖"
+    },
+    "unlisted_model_information": {
+      "carriers": [
+        "PARAMS",
+        "BODY_PROPS",
+        "HIDDEN"
+      ],
+      "examples": [
+        "距离规律与指数",
+        "特征尺度",
+        "时间依赖参数",
+        "属性耦合标度",
+        "暗源几何与强度"
+      ],
+      "evaluation": "由候选规律表达并通过80分轨迹预测检验，不在三字段定律15分中另设已删除声明的专项；不另计自洽分"
+    },
+    "scientific_claim_field_count": 3,
+    "claims_schema_version": "4.0.0",
+    "numerics_version": "1.1"
+  },
+  "submission_evaluation": {
+    "each_submission_is_independent": true,
+    "complete_scoring_per_submission": true,
+    "previous_submission_used_as_scoring_input": false,
+    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价九宇宙；不读取历史提交来补全本次结果或调整本次分数",
+    "new_submission_may_differ": "参赛队可反复改进并提交；不同次运行或随机探索不要求产生相同结果，不把独立新提交当作对旧提交的复算",
+    "best_result_scope": "在线榜单和最终结算均选取同一攻坚组有效完整提交中加权总分最高的一次；其各宇宙分数须来自该同一次完整提交",
+    "per_world_historical_best_stitching_allowed": false,
+    "no_valid_submission_by_deadline_score": 0,
+    "no_submission_definition": "到提交截止时间仍没有一次有效正式提交，记0分；不是自动从开发目录选择草稿或旧发现文件",
+    "pending_evaluation_or_service_failure_policy": "截止前已提交但评测尚未完成、以及指挥部服务失败的处理本轮不自行确定，后续需要时再明确",
+    "ranking_history_vs_scoring": "保存历史用于选择最佳成绩，不等于本次评分依赖历史；提交本身的评分与榜单最佳记录分开处理",
+    "all_valid_competition_submissions_count": true,
+    "participant_practice_submission_mode": false,
+    "competition_start_policy": "从比赛开始，每次有效正式提交都独立完整评测，结果进入在线榜单最佳完整成绩选择；低于历史最佳不替换最佳记录"
+  },
+  "evaluation_resources": {
+    "owner": "指挥部",
+    "location": "指挥部评测端",
+    "uniform_per_evaluation_gpu_allocation": "4×H200，沿用既定统一硬件条件",
+    "shares_team_training_gpus": false,
+    "blocks_team_normal_training": false,
+    "description": "正式评测使用指挥部独立资源，不占用攻坚组用于开发和训练的四卡；指挥部队列容量和通常反馈耗时仍需工程测量"
+  },
+  "development_support": {
+    "practice_meaning": "练习/调试环节仅指挥部成员内部联调，不是参赛阶段；不再给参赛者设置独立练习或不计榜单的正式提交通道",
+    "formal_world_simulator_source_disclosed": false,
+    "formal_world_source_policy": "硬性约束：正式九宇宙真实数值模拟器源码、完整定律实现及其私有配置只对指挥部可见，绝不展示或交付给攻坚组；不能放进公开仓库、参赛镜像、SDK或完整服务包",
+    "public_support_boundary": "可提供客户端SDK、公开操作/提交协议、仅推演候选模型的通用积分器和格式检查器；这些材料不包含正式九宇宙的真实力场",
+    "optional_demo_scope": "指挥部可内部演练；本轮不新增面向攻坚组的练习宇宙或非计榜评测阶段。攻坚组开发自测不影响其正式提交均计榜的规则",
+    "online_vs_final_test_set_relationship": "本轮尚未指定，保持待后续明确",
+    "private_trial_status": "私有真值核心、带噪配额控制台、数值候选基线、计分原型和白名单LLM传输运行器已实现；模型mock只验证协议，实际LLM调用未发生"
+  },
+  "communication_policy": {
+    "internet_allowed": false,
+    "external_api_allowed": false,
+    "official_console_channel_allowed": true,
+    "official_console_channel": "仅允许指挥部指定的IPC或受控内部HTTP JSON接口，供智能体提出实验并接收观测，不属于外部模型/联网服务",
+    "agent_boundary": "智能体可通过这一指定通道访问本会话控制台；禁止访问互联网、任意其他服务或控制台内部实现",
+    "law_boundary": "law.py仍为无网络/文件IO的确定性纯计算；候选定律执行期间不能调用控制台或其他服务"
+  },
+  "experimental_error_handling": {
+    "status": "用户明确暂缓处理，不作为当前设计推进的前置问题",
+    "scope": "本轮不新增请求幂等、复杂失败退款、重试或并发事务政策；仍按已有正常调用配额和格式约束实现基础流程",
+    "not_a_guarantee": "暂缓细则不等于宣称网络或服务故障不会发生；需要时再按真实运行情况明确处理"
+  },
+  "background_prediction": {
+    "status": "本轮采用的实现设计基线，服务仍待实现；逐世界内部适配表不进入参赛资料",
+    "known_initial_state": "全体可见背景共同t0的干净pos/vel及已公开属性由mission提供，后续readout位置仍加噪",
+    "candidate_responsibility": "以候选定律从t0推演背景；先推进到t_launch，再插入验证探针并继续积分。可用确定性等价解析推演，不强制为静止或不产场标记增加无用计算",
+    "no_stepwise_truth_injection": true,
+    "hidden_state_source": "候选需要的不可见对象由其自行估计的HIDDEN或等价候选规律表达；不注入真实隐藏状态",
+    "passivity": "背景演化独立于投放探针；探针互不作用，候选推演使用单向耦合或独立探针分支，不因批量投放增加回作用",
+    "scoring": "只按验证探针轨迹计算预言误差，不另考核背景轨迹；背景若影响探针，其推演误差可自然传导到探针",
+    "fixed_body_policy": "不自动添加公开fixed角色标签；初态静止不等于受外部约束。不能用强制固定掩盖候选对本应自由运动天体的错误作用",
+    "known_attributes_boundary": "仅公开已声明的输入属性；mass目录可给已知质量，p1/p2目录保留原始标量及已有公开语义，不额外揭示真实source/response/inertia映射"
+  },
+  "candidate_metadata_explanation": {
+    "not_scientific_claims": "claims.json仍只有三个科学计分字段，以下是law.py执行时的对象输入或可选模型数据，不新增定律题目",
+    "bodies": "执行器传入的候选状态对象列表：稳定ID、可见/探针/候选隐藏类别、二维pos/vel和允许的属性。只由已知输入及候选估计组成",
+    "BODY_PROPS": "可选的按稳定ID索引的未知属性估计，不得覆盖官方提供的已知初态或已知实验属性，不回写真实宇宙",
+    "HIDDEN": "可选的候选隐藏对象列表；是选手假设而非指挥部返回真值。空列表或非空本身不决定hidden_matter得分",
+    "IDs": "唯一且稳定标识，避免数组换序后把某天体属性用到另一天体；可见、探针、候选隐藏命名空间不能冲突",
+    "types": "例如pos/vel为两个有限实数组成的向量，PARAMS为有限标量映射；机器格式校验与科学真假匹配分开",
+    "list_limits": "如后续采用技术长度限制，应是统一资源限制而非某世界真实隐藏数量；本轮不冻结数值上限",
+    "fixed_flag": "原审查提到的是可选工程约束标记，非新声明项；本轮不新增固定标记公开规则或强制钉住初态静止对象",
+    "precedence": "官方已知对象ID与初态不可被候选覆盖；本次合法实验/验证案例选定的属性优先于mission默认值；BODY_PROPS只补未公开属性；HIDDEN只新增候选对象。",
+    "PARAMS": "最多五个有限实标量；一个键装任意向量、矩阵或数组不算一个标量。BODY_PROPS/HIDDEN仍按既有规则不计入五个上限，不将其当全部Python模型复杂度上限",
+    "remaining_work": "上述是设计语义，完整mission/bodies/BODY_PROPS/HIDDEN JSON Schema与执行适配仍待代码实现"
+  },
+  "validation_design": {
+    "status": "多场景验证设计已采用；私有试做案例已通过有限数值收敛检查，正式范围及案例待讨论后冻结",
+    "same_for_all_teams": true,
+    "depends_on_team_exploration_history": false,
+    "world_constants": "同命名宇宙固定真实定律常数，所有攻坚组相同",
+    "cases": "每宇宙预先固定至少20枚验证探针；分布于多个初态、速度、允许属性及投放时刻配置。每个案例使用预定T个相对采样偏移，绝对时刻=t_launch+readout；不同案例可按物理跨度采用不同偏移，但采样数和记录权重按评分契约统一",
+    "hidden_meaning": "不向参赛者提供验证案例清单和对应轨迹真值，不承诺每个属性值或组合从未被任何队伍探索",
+    "blanket_two_times_launch_distance": false,
+    "spatial_temporal_coverage": "部分案例可在可探索域内；确有必要时增加更广空间或更长时域，但按世界机制与稳定性校准，不统一强制两倍距离或每宇宙域外测试",
+    "calibration": "先检查真值与候选积分收敛、匀速/错核/省略机制基线，再做有限配额带噪闭环；保留现MSE/globalV与80/(1+10e)，分场景归一化仍仅作对照",
+    "online_final_relationship": "共同测试指同一评测阶段各队一致；在线榜与终评是否复用完全同一案例集尚未由用户指定，不自行新增一套宇宙",
+    "coverage_quality": "覆盖使候选规律可被辨别的空间与时间变化，避免只用极短窗、狭窄距离、近匀速弱作用或单一运动形态；具体选择仅指挥部内部保存，不公开逐宇宙机制标签",
+    "numeric_boundaries_and_disclosure": "用户明确等待讨论完成后再冻结；本轮试做区域和样例不是对参赛者的最终范围承诺"
+  },
+  "source_configuration_review": {
+    "current_definitions_have_background_pairing_conflict": false,
+    "source_intervention_changes_geometry_in_current_worlds": false,
+    "future_edits": "用户预计只微调周期、屏蔽等赛前固定规律参数。此类修改通常不新增实验配置分支；收到具体公式后仍需检查源侧控制、背景演化与时间相位是否保持一致",
+    "not_a_guarantee": "不预先保证所有微调都无冲突，不因用户意向提前改公式或取消检查"
+  },
+  "candidate_prediction_review": {
+    "scientific_scoring_inputs_unchanged": "既有候选规律生成的验证轨迹、三个claims及实验能量账本；不新增科学评分项",
+    "meaning_of_candidate_execution": "指挥部调用提交的预测程序并传入本次隐藏验证初态与采样时刻；程序用自身发现的加速度及参数调用固定积分器，返回轨迹后按原规则计分",
+    "fitting_vs_integration": "参数拟合由攻坚组使用公开观测自行完成；预测阶段冻结候选参数并积分求轨迹，指挥部不在隐藏测试上自动替队伍拟合",
+    "public_integrator": "通用程序只含冻结数值算法与接口，以攻坚组提供的加速度为输入，不含正式九宇宙真值力场",
+    "optional_metadata": "BODY_PROPS/HIDDEN是既有可选候选表示，不属于claims，不要求为评分新增人工填写项目；可采用接口允许的等价代码表示",
+    "raw_trajectory_upload": "不采用仅上传预先计算轨迹；未提前公开的测试初始条件只在程序运行时传入，不包含真实隐藏源或未来真值",
+    "selected_team_integration": "已由用户确认：队伍提交可执行预测程序，指挥部正式运行时由该程序调用官方冻结积分器返回轨迹；开发拟合也可调用同版公开积分器"
+  },
+  "private_simulator_boundary": {
+    "hard_constraint": true,
+    "implementation_status": "架构边界已明确；服务、权限隔离与实际验收尚未完成",
+    "public_side": "轻量客户端SDK、公开协议和仅积分候选加速度的通用积分器",
+    "private_side": "正式真值模拟器、宇宙配置、隐藏状态及无噪评分真值，仅指挥部可信服务可访问",
+    "request_path": "智能体经官方受控入口发送公开实验参数；可信服务私下调用真实模拟器，仅返回协议允许的筛选/加噪观测",
+    "execution_separation": "不在参赛Python进程导入真实模拟器或直接exec候选并共享真值内存；参赛/候选工作进程不得读取或挂载私有源码、配置、日志和参考轨迹",
+    "http_limit": "HTTP JSON只是传输，不自动提供源码保密；实现须建立实际进程/文件权限边界，按会话限权，只开放实验操作",
+    "public_package_boundary": "参赛客户端包不直接分发研究仓库全量真值模块；私有实现单独保存和部署。不能靠编译/混淆/要求不阅读作为保密边界",
+    "trusted_integration": "正式计分使用指挥部可信冻结积分器，不依赖攻坚组自报版本或自报未改；候选执行端不得接触真值实现",
+    "requests_are_data_only": "请求仅限公开实验参数，不允许任意代码、模块路径或文件路径要求服务执行",
+    "response_boundary": "只序列化协议允许观测/已知初态/配额，不返回真实力函数、隐藏源状态、私有对象或含敏感内部信息的堆栈"
+  },
+  "framework_reuse_policy": "用户明确：除统一被动探针、observe/launch分工、第一束光、配额等已定差异，优先改造DP已有框架和数据流；不无故自创额外流程，逐项检查是否适合人类竞赛的隔离与客观评分",
+  "observation_noise_contract": "observation_noise.json"
+}

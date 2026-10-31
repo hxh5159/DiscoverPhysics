@@ -1,0 +1,22 @@
+{
+  "noise_version": "1.0.0",
+  "updated": "2026-10-31",
+  "status": "已采用的主线噪声设计；私有控制台已验证，正式服务及真实白名单模型能力仍待验收",
+  "position_distribution": "每个返回的位置坐标独立叠加N(0,sigma^2)",
+  "position_sigma": "sigma=0.01*L_launch",
+  "reference_length": "L_launch为公开投放区域相对公开参考中心的均方根初始距离；按固定的均匀区域参考分布计算，不使用隐藏源或验证轨迹",
+  "annulus_formula": "连续环带r_min<=||pos-center||<=r_max时，L_launch=sqrt((r_min^2+r_max^2)/2)",
+  "ownership": "投放区域冻结时固定同宇宙L_launch，所有攻坚组一致；mission公布参考长度或足以计算它的区域参数",
+  "independent_of_validation_set": true,
+  "velocity_additional_noise": false,
+  "known_initial_metadata_noise": false,
+  "hidden_scoring_truth_noise": false,
+  "fresh_observation_independence": "另行重做同一真实实验独立抽噪声；不同坐标、探针、天体与采样记录独立",
+  "cache_policy": "第一束光生成一次缓存；重复mission/archive不重新模拟或抽噪声",
+  "budget_policy_unchanged": "100点探针能量、每枚1点、20次免费observe仍独立；数值路径能量未耗尽，但未使用额外observe返回值，不能据此认定背景配额或拆分已验收；后续讨论可调整",
+  "retired_rule": {
+    "position_sigma": "0.05*sqrt(validation_V)",
+    "status": "仅保留对照实验，不再作为现行默认；避免验证外逃/空间分散联动放大探索噪声"
+  },
+  "calibration_caveat": "当前速度无额外噪声，可通过短时速度变化估计作用；数值候选库成功不能代替白名单LLM独立发现能力验收，暂不自动增加速度噪声"
+}

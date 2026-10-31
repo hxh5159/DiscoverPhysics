@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:discoverphysics:claims:4.0.0",
+  "title": "物理规律三字段声明格式契约",
+  "description": "仅校验公开格式，不校验科学真值或代码自洽性。三个科学字段必须全部出现；版本由mission和Schema元数据引用，不加入claims.json。claims.example.json为虚构格式示例，不对应任何真实宇宙。严格JSON读取与规范化见scripts/validate_claims.py。",
+  "x-contract-version": "4.0.0",
+  "x-numeric-policy": "dynamics_order只能是数学整数1或2；1、1.0和1e0等价。拒绝NaN、Infinity、溢出和布尔值冒充数字；不把字符串数字转换为数字。",
+  "x-normalization": "按properties顺序输出三个字段，将dynamics_order规范化为JSON整数；其余字段不做类型转换。",
+  "type": "object",
+  "required": ["dynamics_order", "hidden_matter", "time_dependence"],
+  "additionalProperties": false,
+  "properties": {
+    "dynamics_order": {
+      "description": "作用决定的是速度（1）还是加速度（2）。格式预检不判断该声明是否符合本宇宙真实规律。",
+      "type": "integer",
+      "enum": [1, 2]
+    },
+    "hidden_matter": {
+      "description": "是否存在位置不可见、但会产生作用的源；可见天体的未知属性不等同于不可见源。",
+      "type": "boolean"
+    },
+    "time_dependence": {
+      "description": "固定完整瞬时状态与属性后，作用规律是否显式随物理时间变化：有则填true，无则填false。不进一步区分变化形式。对象状态随运动改变或观测噪声不等于规律显式依赖时间。这里只规定语义，不在格式预检中判定科学正确性。",
+      "type": "boolean"
+    }
+  }
+}

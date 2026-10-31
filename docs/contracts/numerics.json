@@ -1,0 +1,61 @@
+{
+  "numerics_version": "1.1",
+  "updated": "2026-10-31",
+  "implementation_status": "公开纯数值共享核心已实现，候选与私有真值调用同一loop且回归通过；正式rift.rollout对象适配、权限隔离与远端验收仍待完成",
+  "integrator": "yoshida4",
+  "dt": 0.005,
+  "dtype": "float64",
+  "sampling": {
+    "rule": "grid_aligned_integer_ticks",
+    "grid_step": 0.005,
+    "alignment_tolerance_ticks": 1e-09,
+    "conversion": "将公开输入t除以0.005，仅在与最近整数tick之差不超过容差时接受；容差用于浮点表示，不用于把非网格时刻改写成邻近时刻",
+    "non_grid_input_policy": "拒绝并返回公开格式/范围错误；不再使用nearest_grid_round或ties-to-even来静默吸附任意公开请求",
+    "input_domain": "物理时间输入有限且非负，并位于本宇宙公开时间范围内",
+    "time_coordinates": "t_launch是共同物理t=0下的绝对时刻；readout是相对偏移；实际采样tick=launch_tick+offset_tick",
+    "readout_order": "相对偏移严格递增，可包含0，每批至多50个",
+    "returned_times": "明确返回实际投放及实际采样时刻",
+    "internal_integrator_substeps": "仅公开请求/采样时间受网格约束；Yoshida的内部子步时间仍按既定算法，不强迫它们落在公开网格上"
+  },
+  "softening": {
+    "length": 0.05,
+    "amplitude_radius": "rho=sqrt(r*r+epsilon*epsilon)",
+    "unit_direction": "delta/r，r为真实几何距离",
+    "self_and_zero_interaction_pairs": "求方向前屏蔽自作用与确定无作用的粒子对，防止0乘0/0",
+    "ownership": "加速度函数/公开几何工具按此约定求力；积分器不对返回加速度重复施加软化"
+  },
+  "shared_implementation": "候选轨迹与最终推演调用同一冻结实现；只使用相同算法名字不足以保证数值一致",
+  "candidate_inputs": "可见背景共同t0的干净位置/速度及已公开属性，候选自行估计的未知属性/隐藏对象；候选先推演到t_launch再置入验证探针初态；不逐步注入真实未来背景或真实隐藏状态",
+  "private_world_access": false,
+  "freeze_policy": "赛前公布并锁定实现及版本；后续变更统一公告，不由单队自行替换正式推演模块",
+  "time_meaning": {
+    "physical_time": "仿真中的无量纲时间坐标，绝对仅指相对统一物理t=0；不是现实日期或钟点",
+    "wall_clock": "从会话开始累计的现实经过时间，既定上限3600秒；不参与节约分，仍约束探索运行"
+  },
+  "background_propagation": "候选负责背景推进，所有探针不反作用于背景且互不作用；只评探针轨迹，不另评背景。初始静止不等于官方强制固定",
+  "dp_reference_review": {
+    "status": "DP事实保留；用户已确认本赛严格网格，拒绝非网格输入，不采用任意时刻最近步吸附",
+    "dp_recording": "executor.py:_record_at_times用int(round(mt/dt))索引最近积分步，不强制用户时刻对齐；默认nbody dt=0.005",
+    "dp_reported_times": "返回measurement_times仍是原请求列表，未显式返回实际量化时刻",
+    "dp_candidate_prediction": "evaluator对每个测试t以同一初态调用discovered_law(duration=t)；候选可用自身数值方法，prompt推荐solve_ivp自适应RK45，不强制统一候选积分器",
+    "current_contest_difference": "当前numerics1.1要求公开输入先对齐0.005网格，是本赛额外约定，不是DP原始限制",
+    "current_grid_rule_changed": false,
+    "reuse_limit": "不要原样继承非网格请求的原标签与实际采样错时；保留本赛共同t0和t_launch+readout，不因复用而重置背景相位",
+    "not_adopted_quantization_alternative": {
+      "recommended_compatibility": "若采用DP式输入，可接收合法物理时间并由SDK/服务统一取最近网格，显式返回实际时刻；真值与候选预测均用实际时刻",
+      "launch_readout_rule_to_freeze_if_adopted": "沿既有相对readout语义，先分别量化t_launch和readout为整数tick再相加；所有路径一致，不能混用Q(a)+Q(b)和Q(a+b)"
+    },
+    "quantization_proposal_adopted": false,
+    "confirmed_current_policy": "合法对齐时刻统一成整数tick并返回规范实际时刻；所有评分路径用同一时刻，t_launch与readout分别校验后相加"
+  },
+  "shared_module": {
+    "package": "rift_numerics",
+    "implementation_version": "rift-numerics-1.0.0",
+    "formal_entry": "rift_numerics.rollout(acceleration, positions, velocities, t_launch=..., duration=...)",
+    "fixed_step": 0.005,
+    "contains_true_world_laws": false,
+    "scope": "仅冻结数学积分；对象/属性与候选提交适配层仍待接入，不等于完整参赛SDK",
+    "diagnostic_entry": "diagnostic_rollout使用同一loop做指挥部步长收敛检查，不是队伍可选正式积分精度"
+  },
+  "prediction_program_protocol": "已确认队伍提交可执行预测程序，运行时接收测试初态/时刻并调用固定rollout返回轨迹；仅有纯数学共享核心不代表通用装载/执行适配已完成"
+}

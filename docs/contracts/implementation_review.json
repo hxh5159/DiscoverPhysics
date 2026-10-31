@@ -1,0 +1,277 @@
+{
+  "review_version": "1.5.0",
+  "review_date": "2026-10-31",
+  "scope": "实现前审查及已实现私有数值/带噪配额/评分/白名单传输试做；正式服务、模型能力及最终范围仍未验收",
+  "basis": {
+    "statement": "docs/彼岸物理规律发现挑战赛_赛题说明.docx",
+    "exploration": "3.6.0",
+    "claims": "4.0.0",
+    "scoring": "draft-3.6.0",
+    "numerics": "1.1",
+    "feedback": "1.0.0",
+    "observation_noise": "1.0.0"
+  },
+  "implementation_ready": false,
+  "constant_policy_review": {
+    "current_rule": "同一命名宇宙的定律常数预先固定，重复实验和重新运行不重抽；不同宇宙可有不同常数",
+    "distinctions": [
+      "定律常数与每次可控的粒子属性不同",
+      "按固定函数显式随时间变化不等于重新随机抽参数",
+      "观测噪声独立抽取不等于真实定律重抽",
+      "拟合候选物理模型参数不等于改变模拟器常数或训练LLM权重"
+    ],
+    "dp_findings": [
+      "公开世界真实常数主要在worlds.py/executor.py预先设定，并非评分器逐次拟合真实常数",
+      "LLM可硬编码已确定常数，或声明最多五个带init/bounds的fit_parameters供可选拟合",
+      "中途拟合使用本run的实验CSV，最终拟合使用成功发现实验记录；没有发现用隐藏评分测试轨迹调参的路径",
+      "并非公开11世界全部默认最终自动拟合；最终入口名单遗漏coulomb_easy，结构类世界也跳过，不能直接当竞赛统一协议",
+      "no-mse只禁中途拟合，最终满足条件的拟合仍保留",
+      "部分CSV拟合路径补入执行器保存的可见天体初速度，移植时必须审查是否超出参赛者输入权限"
+    ],
+    "recommendation_not_new_rule": "首版继续固定真实常数，由攻坚组自行拟合并提交最终参数；若以后引入随机化，应在实例创建时抽一次、整局冻结，所有攻坚组使用相同实例集并重新校准",
+    "copying_limit": "只改或随机化数值不能阻止套用相同函数族；局部改作用结构与是否随机常数是不同设计选择",
+    "world_changes": "用户计划下一步微调个别力场，具体宇宙和改动尚未给出，本轮不改定义或真值",
+    "confirmed_decision": "用户再次确认暂保持定律参数固定，不引入随机常数"
+  },
+  "findings": [
+    {
+      "id": "A01",
+      "priority": "P0",
+      "kind": "rule_decision",
+      "topic": "候选模型预测背景的责任与输入可见性",
+      "evidence": [
+        "草稿law.py接口",
+        "numerics.json:candidate_inputs"
+      ],
+      "issue": "采用DP式已知可见背景t0干净初态，由候选自行推演；不逐步注入真实未来背景或隐藏状态。仅评验证探针，源属性只公开已知目录语义",
+      "impact": "两种路线科学任务和权限不同；逐步注入真实B(t)可能构成不消耗observe的干净背景通道",
+      "minimum_resolution": "实现稳定ID及候选状态接口、探针单向耦合和t_launch插入；不自动添加固定标签或将平衡静止体硬钉住。逐世界内部背景表已私有保存",
+      "status": "设计已明确，完整schema/运行适配待实现"
+    },
+    {
+      "id": "A02",
+      "priority": "P0",
+      "kind": "interface_ambiguity",
+      "topic": "源侧干预与背景配置对应",
+      "evidence": [
+        "exploration_protocol.json:time_model.source_property_interventions",
+        "草稿observe/launch示例"
+      ],
+      "issue": "这是条件性接口风险，不是当前已发生冲突；内部核对当前允许源属性改变的情况不改变背景位置/速度轨迹，其余背景场景未开放源侧干预",
+      "impact": "背景和探针数据可能被错误配对；不是已证明现有固定源背景已出错",
+      "minimum_resolution": "当前observe(times)保持唯一背景，不新增config_id，也不由最近一次launch隐式决定。后续若改力场使干预影响背景，须同步修订配置语义",
+      "status": "当前无实际冲突；用户给出周期/屏蔽等具体微调后复查"
+    },
+    {
+      "id": "A03",
+      "priority": "P0",
+      "kind": "workflow_gap",
+      "topic": "练习、在线榜单与冻结终评",
+      "evidence": [
+        "草稿四个阶段",
+        "AGENTS.md:多次提交及刷榜要求"
+      ],
+      "issue": "参赛者从开赛起所有有效正式提交都评测并更新最佳完整成绩，不设置不计榜单练习模式；练习仅指挥部内部联调。榜与终评是否换案例未指定",
+      "impact": "固定宇宙可能被跨提交记住；不能把重复同一实例的改进等同对新宇宙的发现泛化",
+      "minimum_resolution": "实现独立单次评分与独立的最佳成绩汇总，不拼接各宇宙历史最好分；正式九宇宙源码保持私有。其余实例/持久化边界后续另定",
+      "status": "部分明确：独立提交和最佳完整成绩已定，榜单/终评测试集关系待后续"
+    },
+    {
+      "id": "A04",
+      "priority": "P1",
+      "kind": "resource_decision",
+      "topic": "实时排名与完整探索耗时",
+      "evidence": [
+        "草稿每宇宙60分钟",
+        "草稿九宇宙依次运行",
+        "每组4H200与48小时"
+      ],
+      "issue": "用户明确评测在指挥部独立硬件上运行，不占用攻坚组四卡，不影响各组正常训练。九宇宙各1h使单次最坏9h仍只是指挥部端上界，不再作为训练资源冲突",
+      "impact": "不能再推断评测挤占攻坚组训练；指挥部队列容量和通常反馈耗时仍需实际测量",
+      "minimum_resolution": "按指挥部独立、统一4×H200评测资源实施，后续只测吞吐和反馈延迟，不再要求各组暂停训练",
+      "status": "评测资源归属已明确；仅剩指挥部端吞吐测量"
+    },
+    {
+      "id": "A05",
+      "priority": "P2",
+      "kind": "transaction_gap",
+      "topic": "计费、重试、并发和截止",
+      "evidence": [
+        "草稿仪器收费",
+        "exploration_protocol.json:submission"
+      ],
+      "issue": "尚未定义批次部分非法、模拟失败、通信超时、同一请求重试、并发扣账与截止前后返回的语义；mission前启动也缺外层资源上限",
+      "impact": "可能重复扣费、免费获得多份噪声或无限占用启动/服务资源",
+      "minimum_resolution": "本轮不设计复杂重试、幂等或退款机制；先按正常请求和已定配额实现，需要时再依据真实运行问题处理，不声称故障绝不发生",
+      "status": "用户明确暂缓，不作为当前推进前置"
+    },
+    {
+      "id": "A06",
+      "priority": "P0",
+      "kind": "schema_gap",
+      "topic": "机器输入输出与参数元数据",
+      "evidence": [
+        "草稿任务包和law.py接口",
+        "exploration_protocol.json:parameter_count_policy"
+      ],
+      "issue": "用户已选择提交可执行预测程序：指挥部运行时传入测试初态与时刻，程序调用官方固定积分器返回轨迹；不收预先计算的轨迹文件。通用程序入口与机器Schema仍待实现",
+      "impact": "无法直接编写稳定校验器，可能有巨大数组或隐藏对象列表以及覆盖已知初态的问题",
+      "minimum_resolution": "固定程序输入输出Schema与装载适配，输入只给必要初态/属性/时间，不传内部name/group标签或真实隐藏状态；保留三claims与既有五PARAMS/可选模型数据规则",
+      "status": "提交职责已确认；通用程序装载、冻结积分器调用约束和正式执行适配待实现"
+    },
+    {
+      "id": "A07",
+      "priority": "P0",
+      "kind": "numerics_gap",
+      "topic": "时空合法域和时间网格",
+      "evidence": [
+        "各世界实验目录待校准",
+        "numerics.json:sampling",
+        "exploration_protocol.json:pending_calibration_or_implementation"
+      ],
+      "issue": "公开物理时间采用0.005整数tick，t_launch、readout、observe时刻须网格对齐，只有浮点表示误差可容忍；相对偏移严格递增且可含0。各世界允许的空间/属性/最大物理时间仍需冻结",
+      "impact": "影响请求校验、缓存、噪声重复测量、轨迹初态和同一积分器的一致性",
+      "minimum_resolution": "沿用整数tick校验与实际时刻返回；正式隐藏案例先统一预检，配置错误不归咎候选。现试做案例均合法，未来案例生成不得无校验rint后直接评分",
+      "status": "用户确认保持numerics1.1严格网格；不采用任意时刻最近步吸附。SDK/真值/候选/拟合时刻须一致"
+    },
+    {
+      "id": "A08",
+      "priority": "P1",
+      "kind": "calibration_and_implementation",
+      "topic": "积分器适用性与官方数值实现",
+      "evidence": [
+        "nbody_sampler.py:_make_step",
+        "numerics.json:softening",
+        "草稿NumPy/SciPy许可"
+      ],
+      "issue": "Yoshida当前代码正确处理子步时间，但未来新增速度依赖/不光滑作用不能自动宣称原阶数；幅值软化没有单独定义重合点方向。JAX真值引擎不能假定直接兼容任意NumPy/SciPy候选函数",
+      "impact": "近源或长期误差可能主导成绩，候选执行路径可能需不同后端桥接及性能预算",
+      "minimum_resolution": "冻结公开和私有共享数值实现，真值做步长减半与边界测试；明确重合/逃逸/积分失败，先测Python候选路径实际成本。不能把指挥部真值失败算作队伍预测错误"
+    },
+    {
+      "id": "A09",
+      "priority": "P1",
+      "kind": "reproducibility_ambiguity",
+      "topic": "同一提交重算与完整智能体重跑",
+      "evidence": [
+        "草稿同一份有效提交重算得分不变",
+        "新实验噪声独立抽取"
+      ],
+      "issue": "用户明确重复提交每次都完整独立计分，不依赖过去提交；不能要求不同次完整探索得到相同分数，也不能把独立新提交作为对历史结果的复算",
+      "impact": "历史只用于选出最佳完整成绩，不参与本次评分；若将来内部需要申诉复核，可另保存本次冻结制品，但不改变独立提交逻辑",
+      "minimum_resolution": "分开实现本次评分和历史最佳汇总；同一完整提交的各宇宙分数不可被跨提交拼接。未完成评测或服务故障的截止政策不在本轮自行发明",
+      "status": "每次正式提交独立的比赛逻辑已明确"
+    },
+    {
+      "id": "A10",
+      "priority": "P2",
+      "kind": "known_feedback_leakage",
+      "topic": "仅总分不能保证声明真值不可反推",
+      "evidence": [
+        "scoring.json:feedback.information_leakage_limit",
+        "scoring.json:saving"
+      ],
+      "issue": "仅总分仍可能被多次提交差分分析；用户认可其缓解作用并决定暂保持，不要求本轮根除。节约资格现改为预言分>=40，与定律满分无关",
+      "impact": "与绝对防猜标签目标不相容，不能只靠隐藏分项宣称已解决",
+      "minimum_resolution": "维持仅加权总分和每宇宙总分，不新增提交限次或额外防护；按P>=40实施节约资格，避免继续使用已失效的L=15门槛",
+      "status": "用户接受残余风险，暂保持仅总分反馈"
+    },
+    {
+      "id": "A11",
+      "priority": "P1",
+      "kind": "validation_definition",
+      "topic": "固定验证集、外推与归一化",
+      "evidence": [
+        "草稿探索中未使用的属性组合",
+        "scoring.json:固定N*T记录与V"
+      ],
+      "issue": "预先固定所有队伍共同的隐藏验证案例，独立于各组探索历史；取消统一两倍距离及每个属性组合从未被探索的绝对承诺",
+      "impact": "按队伍历史动态换测试会损害横向可比，简单静止或匀速基线也可能偏高",
+      "minimum_resolution": "各宇宙共用T及tau_k=kD/T采样方式、统一.005网格，按机制校准各案例D/t_launch及空间属性覆盖；不统一两倍距离，正式范围与公开粒度后续冻结",
+      "status": "验证原则已明确，逐世界范围与数值校准待完成"
+    },
+    {
+      "id": "A12",
+      "priority": "P0",
+      "kind": "delivery_scope_conflict",
+      "topic": "指挥部交付清单与权重制品",
+      "evidence": [
+        "草稿练习源码承诺",
+        "草稿只提供四样",
+        "草稿SDK/rollout",
+        "AGENTS.md:模型规格尚未核验"
+      ],
+      "issue": "用户明确正式九宇宙的真实数值模拟器源码不得提供给参赛者。公开客户端SDK、候选通用积分器和格式检查不包含真实力场；可选接口演示不是正式宇宙源码。权重revision、资源和实际交付仍需后续验收",
+      "impact": "参赛起步与复现成本不可预测，可能在正式运行才发现底座无法加载或无可用练习入口",
+      "minimum_resolution": "硬约束：正式九宇宙真实数值模拟器完整源码和私有配置只指挥部可见；参赛SDK/积分器不得含真值，禁止将完整私有服务包分发。完整交付仍待实现",
+      "status": "正式宇宙源码私有边界已明确，交付清单仍待落实"
+    },
+    {
+      "id": "A13",
+      "priority": "P1",
+      "kind": "training_and_state_policy",
+      "topic": "训练数据与跨局记忆",
+      "evidence": [
+        "草稿微调数据来源",
+        "允许SFT/RL和记忆管理",
+        "最终评测无人干预"
+      ],
+      "issue": "是否允许用官方在线观测更新权重、不同宇宙/提交之间保留记忆或定律文件、发现数据是否可带回开发区尚未明确",
+      "impact": "同一策略可能被一队理解为合法在线学习，另一队理解为违规使用隐藏数据；固定世界更容易跨次复用答案",
+      "minimum_resolution": "分别规定开发训练、评测内优化和跨会话持久化，确定允许输出/保留的攻坚组自产数据，不把组委会拟合器偷偷补全的隐藏信息提供给参赛者"
+    },
+    {
+      "id": "A14",
+      "priority": "P0",
+      "kind": "communication_and_execution_boundary",
+      "topic": "断网约束与官方控制台通信",
+      "evidence": [
+        "禁止任何联网和外部API",
+        "允许HTTP JSON控制台",
+        "DP同进程exec实现"
+      ],
+      "issue": "智能体只允许访问指挥部指定的官方IPC或受控内部HTTP JSON通道，其作用是发送实验请求和接收观测；禁止互联网和外部API。law.py保持纯计算、不得联网",
+      "impact": "正常SDK可能被禁网阻断，或实现只靠提示词保密而无法隔离真实模拟器和评测记录",
+      "minimum_resolution": "HTTP仅传公开请求/允许观测；真实模拟器独立于不可信参赛/候选进程，不暴露私有文件或内存。官方积分器与私有真值引擎分开，正式执行可信冻结版本；不移植DP同进程exec隔离方式",
+      "status": "官方通信例外已明确，执行隔离仍待实现"
+    }
+  ],
+  "suggested_next_steps_not_frozen": [
+    "在具体改场前或并行冻结候选状态接口、实验配置与公开/私有评测边界",
+    "宇宙数值讨论暂告一段落；现阶段不继续改力场，转完善程序提交/运行接口及输入边界",
+    "先用接口联调示例和一个正式私有世界跑通任务包、观测、投放、队伍拟合、草稿、提交、评分与仅总分反馈闭环",
+    "把通过闭环的公共接口扩展到九世界，再做数值/信息配额/算力/榜单区分度校准",
+    "保留25年参考的固定Agent入口、统一eval与可改/不可改边界，但不声称参考附件已包含全部训练数据或现场验收"
+  ],
+  "verification_scope": "仅设计契约与格式/边界核对；背景/验证原则已明确，完整schema、SDK、私有服务、GPU及远端流程未实现或验收",
+  "confirmed_this_turn": [
+    "节约仅按预言分>=40判断，与定律分无关",
+    "正式提交各次独立完整计分，榜单与结算取最佳完整提交，截止无有效提交记0",
+    "组委会独立评测硬件不占攻坚组训练资源",
+    "计费失败/重试细则暂缓，不作为当前前置",
+    "物理时间采用0.005整数tick，墙钟不计分但仍有限制",
+    "正式九宇宙真实模拟器源码不向参赛者提供，公开候选积分器与客户端不等于公开真实力场",
+    "允许唯一官方控制台通信，禁止外网与外部API，候选law仍无IO",
+    "接受当前总分反馈的残余反推风险，暂不增加防护",
+    "真实定律常数继续固定",
+    "背景可见t0初态公开且候选自行推进，不注入未来真值，仅评验证探针",
+    "当前源侧配置无实际背景配对冲突，不新增配置ID",
+    "验证案例预先固定，取消统一两倍距离及逐队从未使用属性组合承诺",
+    "练习仅指挥部内部调试；参赛者开赛有效正式提交全部计榜",
+    "正式九宇宙真值模拟器源码仅指挥部可见是硬约束",
+    "已选择可执行预测程序内调用固定积分器返回轨迹的正式提交方式",
+    "非网格直接拒绝，统一规范时刻；不采纳最近步吸附替代方案",
+    "各宇宙统一相对采样方式，按机制决定覆盖，不统一两倍距离",
+    "真实常数固定而不等于已公开；候选参数由攻坚组自行估计，指挥部不在隐藏测试上替其拟合"
+  ],
+  "trial_status": {
+    "private_core": "implemented",
+    "noisy_budget_console": "implemented_and_tested",
+    "scoring_prototype": "implemented_and_tested",
+    "numeric_hypothesis_library": "budgeted_noisy_trials_completed_not_an_LLM",
+    "actual_white_model_inference": "not_run_not_requested_this_round",
+    "white_model_protocol_mock": "passed_not_a_capability_result",
+    "final_numeric_ranges": "discussion_pending",
+    "program_submission_alignment": "旧闭源试做功能链一致；实际制品是JSON表达式经框架构造成预测对象，尚未验收任意程序文件提交/装载/调用约束"
+  }
+}
