@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "submission_id": "interface-demo-v1",
+  "team_id": "example-team",
+  "version": "0.1.0",
+  "entrypoint": ["python", "agent.py"],
+  "models": [
+    {
+      "base_model": "Qwen3.6-35B-A3B",
+      "path": "/models/Qwen3.6-35B-A3B-W8A8",
+      "adaptation": "quantized"
+    }
+  ]
+}

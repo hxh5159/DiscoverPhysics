@@ -1,0 +1,56 @@
+攻坚组智能体提交规范 1.0.0
+
+一、两层提交
+
+外层提交包含攻坚组的智能体代码、运行环境与submission.json；指挥部据此启动本次智能体，在九个宇宙依次运行。
+每个宇宙内，智能体最终通过控制台提交law.py与claims.json。law.py接口与计分沿用LAW_API.txt及既定规则，不另按程序样式计分。
+外层清单不包含真实宇宙配置、隐藏测试、评分标签或额外科学声明。
+
+二、启动清单
+
+    {
+      "schema_version": "1.0.0",
+      "submission_id": "team01-v1",
+      "team_id": "team01",
+      "version": "1.0.0",
+      "entrypoint": ["python", "agent.py"],
+      "models": [{
+        "base_model": "Qwen3.6-35B-A3B",
+        "path": "/models/Qwen3.6-35B-A3B-W8A8",
+        "adaptation": "quantized"
+      }]
+    }
+
+六个根字段必填，不接受未知字段。submission_id与team_id使用不超过64字符的字母数字标识，可含点、横线和下划线；version为本组版本说明。
+entrypoint是参数数组，运行器直接执行，不把它拼成shell命令；不接受bash/sh等shell包装入口。正式镜像须将本组代码放在/submission，运行器固定以此为工作目录，并按entrypoint覆盖镜像原有入口。镜像中的代码与本次受理版本对应；本地工程自检则以指定提交目录为工作目录。
+所有模型均须声明白名单底座base_model与容器内path，可另给revision、sha256、adaptation；后者为base、quantized、sft、rl或other。模型大小和推理配置由攻坚组负责，清单声明不保证显存可用或来源已获验证。
+模型可放包内相对目录，也可引用指挥部只读挂载的/models/...；禁止..路径穿越及任意宿主机绝对路径。已有公共权重由指挥部把实际Linux路径映射到该挂载，不由清单请求host挂载。
+镜像名称、经运行时核验的不可变镜像摘要、网络、硬件和目录挂载由平台受理与运行器管理，不以清单字符串代替实际核验。
+
+三、智能体运行环境
+
+每个宇宙启动时，可信运行器设置：
+RIFT_CONSOLE_URL：完整的官方控制台调用地址。
+RIFT_SESSION_TOKEN：仅授权访问本局会话的令牌，不应写进源码、清单或日志。
+RIFT_OUTPUT_DIR：本局智能体可写的产物目录；本组在此生成law.py与claims.json，再调用save_draft/submit。
+智能体使用rift.Console完成mission、观测与提交。只允许指定官方通信通道；law.py仍为不联网、不读写文件的纯数学程序。
+启动过程、模型服务复用和跨局持久化由正式运行配置说明，不由偶然共享进程或目录决定合法性。每宇宙60分钟仍从首次成功mission开始。
+
+四、公开自检
+
+在远端项目根目录运行：
+
+    python scripts/validate_submission.py examples/submission.json
+    python scripts/validate_submission.py submission.json --root . --check-files
+
+默认仅检查JSON、白名单标识和路径格式，不运行entrypoint、不联网、不加载权重。格式通过不等于模型来源、镜像可运行性或科学正确性通过。
+--check-files明确请求检查包内模型是否存在；若声明sha256，则读取文件或目录计算摘要，可能耗时较长。/models引用留待正式挂载环境核验，不读取本机任意绝对目录。
+单文件sha256为文件原始字节摘要；目录sha256为按POSIX相对路径排序的文件清单[{"path":...,"sha256":...}]的UTF-8紧凑JSON摘要，字典键依次为path、sha256。包内模型路径及内容不使用符号链接。
+examples/agent.py是接口冒烟示例，只提交零加速度和任意合法格式声明，不调用模型、不发现规律；不能把它当作实际任务完整方案。examples/submission.json仅展示模型路径声明。
+
+五、公开包边界与部署状态
+
+scripts/package_contest_starter.py按固定白名单生成环境与接口起步包，必须显式传--output；不打包整个研究仓库、不包括项目记忆、研究笔记、正式宇宙源码、验证轨迹、真值或内部日志。它不打包真实模型权重或产生完整运行镜像。
+允许攻坚组跨次提交保留和复用自己合法获取的观测、候选规律，以及基于白名单训练的权重。每次正式运行仍新建独立会话与配额，独立完整计分；评分器不拼接历史各宇宙成绩。可归还的本队自有记录、代码和产物不包括指挥部评分分项、声明正误、隐藏验证轨迹或真值，也不授予读取内部运行目录的权限。
+截止前成功受理的版本可以在截止后完成评测并计入最佳完整成绩。指挥部基础设施故障保留该受理版本，修复后重评；候选程序自身失败仍按既有规则处理。
+正式profile的最终数值与资源范围仍待冻结。当前入口契约和预检可用，目标Linux镜像、GPU推理、正式隔离和现场队列容量仍须集成验收。

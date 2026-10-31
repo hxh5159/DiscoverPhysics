@@ -1,0 +1,7 @@
+# BASE_IMAGE is an offline official image supplied by the contest organizers.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+WORKDIR /submission
+COPY . /submission
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
+# The trusted runner provides the public SDK and executes submission.json.

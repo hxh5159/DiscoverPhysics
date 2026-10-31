@@ -1,0 +1,85 @@
+{
+  "runtime_version": "1.1.0",
+  "updated": "2026-10-31",
+  "status": "implemented_local_engineering_checks_target_linux_deployment_pending",
+  "outer_submission": {
+    "manifest_schema": "submission.schema.json",
+    "identity": "受理时冻结经验证的清单和实际不可变镜像摘要；正式运行只使用该版本",
+    "entrypoint": "清单entrypoint参数数组，工作目录/submission；不经宿主机shell拼接",
+    "world_order": [
+      "Adam",
+      "Lilith",
+      "Tabris",
+      "Sachiel",
+      "Ramiel",
+      "Matriel",
+      "Leliel",
+      "Arael",
+      "Lilin"
+    ],
+    "runs_per_world": 1,
+    "team_training_gpus_used": false,
+    "evaluation_gpu_allocation": "指挥部独立评测端4×H200，九宇宙顺序运行"
+  },
+  "session": {
+    "console_protocol_version": "1.0.0",
+    "exploration_protocol_version": "3.8.0",
+    "authenticated": true,
+    "client_selects_world_or_session": false,
+    "wall_clock_seconds": 3600,
+    "clock_start": "本宇宙首次成功mission；重复调用不重置配额或时钟",
+    "external_watchdog": true,
+    "energy": 100,
+    "observe_calls": 20,
+    "fixed_llm_round_cap": false,
+    "invalid_artifact_ends_session": false,
+    "successful_submit_ends_session": true,
+    "timeout": "封存最后一份及时有效的law.py/claims.json配对；没有有效配对则该宇宙0分",
+    "early_agent_exit": "停止该局并保留最后有效配对；如为指挥部运行基础设施失败，标记故障等待修复重评，不发布伪零分"
+  },
+  "communication": {
+    "agent": "唯一官方认证控制台通道；生产Linux使用Unix socket，普通HTTP仅本机工程诊断",
+    "law": "只接受允许的测试初态和时刻，不含控制台凭证，不联网或读写文件",
+    "actual_permission_isolation": "生产容器断网、只读官方运行时，不挂载真实宇宙或评分文件；目标环境权限仍需验收"
+  },
+  "artifacts": {
+    "per_world": [
+      "law.py",
+      "claims.json"
+    ],
+    "optional": [
+      "report.md"
+    ],
+    "atomic_pair": true,
+    "prediction": "队伍本地与指挥部正式驱动都调用同一固定积分器；law.py只提供候选加速度",
+    "format_errors": "公开code/path/message，仅报告格式与运行接口问题，不判科学正误",
+    "own_export": "可归还本组任务包、允许观测、候选规律、声明与自产模型成果；绝不含官方隐藏真值、分项和诊断日志"
+  },
+  "learning_and_persistence": {
+    "confirmed": true,
+    "cross_submission": "允许复用本队合法取得的观测、候选规律及基于白名单形成的模型成果",
+    "new_run": "每次正式运行新建独立会话、配额和完整成绩；评分器不拼接历史结果",
+    "knowledge_vs_scoring": "独立评分不等于禁止合法知识复用；运行器不自动注入历史秘密或其他队伍数据",
+    "manual_intervention_during_evaluation": false
+  },
+  "queue_and_ranking": {
+    "scope": "内部验证和正式比赛使用不同且持久化标记的队列数据库，不得混写",
+    "deadline_basis": "成功受理时间，截止前受理的版本可在截止后完成评测",
+    "deadline_persisted": true,
+    "infrastructure_failure": "保留原受理版本，修复后重评，不当作候选科学失败",
+    "best": "最高一次完整九宇宙提交；不拼接逐宇宙历史最高分",
+    "score_feedback": [
+      "total_score",
+      "world_scores"
+    ],
+    "tiebreak": "总分相同，比较同次完整提交的加权节约分，较低者优先；仍同并列，不重跑模型或实验",
+    "private_ranking_metadata": "同次九宇宙C与加权C只存私有数据库，不进入反馈；缺元数据的旧记录须从已保存的匹配私有结果迁移后再排名"
+  },
+  "pending_release_checks": [
+    "正式空间、属性和物理时域配置及验证范围公开粒度",
+    "容器启动、候选执行、CPU/内存与输出资源profile的统一正式值",
+    "Linux Unix socket权限、Docker隔离和4H200真实白名单模型运行",
+    "模型启动/复用、完整任务实际耗时、并发容量和48小时内多次提交能力",
+    "正式镜像、权重revision与摘要核验及发布profile审批"
+  ]
+}

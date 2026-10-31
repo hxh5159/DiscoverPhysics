@@ -1,8 +1,8 @@
 {
-  "protocol_version": "3.7.0",
+  "protocol_version": "3.8.0",
   "updated": "2026-10-31",
-  "implementation_status": "候选law SDK、静态预检、独立固定积分worker及私有配对/计分桥已实现并测试；正式控制台/执行权限/榜单与远端镜像仍待集成验收",
-  "revision_scope": "按最新分工：law.py只提供候选加速度及参数，队伍本地推演与指挥部正式积分均调用公开固定rift.rollout；采用law_api1.0与严格输入/元数据预检，不使用JSON数学表达式作为正式制品",
+  "implementation_status": "公开Console、外层清单/起步包、私有会话服务、固定预测桥、九宇宙运行器、持久化队列与榜单已实现并做本地工程检查；目标Linux权限/GPU/模型/容量和正式profile仍待验收",
+  "revision_scope": "开始正式赛题构建；增加外层运行/服务/队列契约，确认合法成果跨提交复用及截止前受理可延后评完；不改力场、数值、配额或计分公式",
   "scoring_contract": "scoring.json",
   "feedback_contract": "feedback.schema.json",
   "evaluation_feedback": {
@@ -291,7 +291,7 @@
     "per_world_historical_best_stitching_allowed": false,
     "no_valid_submission_by_deadline_score": 0,
     "no_submission_definition": "到提交截止时间仍没有一次有效正式提交，记0分；不是自动从开发目录选择草稿或旧发现文件",
-    "pending_evaluation_or_service_failure_policy": "截止前已提交但评测尚未完成、以及指挥部服务失败的处理本轮不自行确定，后续需要时再明确",
+    "pending_evaluation_or_service_failure_policy": "截止前成功受理的不可变版本可在截止后完成；指挥部基础设施故障保留该版本修复重评，候选自身失败沿既有规则",
     "ranking_history_vs_scoring": "保存历史用于选择最佳成绩，不等于本次评分依赖历史；提交本身的评分与榜单最佳记录分开处理",
     "all_valid_competition_submissions_count": true,
     "participant_practice_submission_mode": false,
@@ -312,7 +312,9 @@
     "public_support_boundary": "可提供客户端SDK、公开操作/提交协议、仅推演候选模型的通用积分器和格式检查器；这些材料不包含正式九宇宙的真实力场",
     "optional_demo_scope": "指挥部可内部演练；本轮不新增面向攻坚组的练习宇宙或非计榜评测阶段。攻坚组开发自测不影响其正式提交均计榜的规则",
     "online_vs_final_test_set_relationship": "本轮尚未指定，保持待后续明确",
-    "private_trial_status": "私有真值核心、带噪配额控制台、数值候选基线、计分原型和白名单LLM传输运行器已实现；模型mock只验证协议，实际LLM调用未发生"
+    "private_trial_status": "本地工程链路已实现；模型/API试做仍暂停，正式Linux权限/镜像/GPU/容量待验收",
+    "own_legal_artifacts_reusable_across_submissions": true,
+    "own_artifact_export": "归还本队任务、合法观测、候选规律与自产模型成果；不含真值、分项和内部日志"
   },
   "communication_policy": {
     "internet_allowed": false,
@@ -360,7 +362,7 @@
     "hidden_meaning": "不向参赛者提供验证案例清单和对应轨迹真值，不承诺每个属性值或组合从未被任何队伍探索",
     "blanket_two_times_launch_distance": false,
     "spatial_temporal_coverage": "部分案例可在可探索域内；确有必要时增加更广空间或更长时域，但按世界机制与稳定性校准，不统一强制两倍距离或每宇宙域外测试",
-    "calibration": "先检查真值与候选积分收敛、匀速/错核/省略机制基线，再做有限配额带噪闭环；保留现MSE/globalV与80/(1+10e)，分场景归一化仍仅作对照",
+    "calibration": "先检查真值与候选积分收敛、匀速/错核/省略机制基线，再做有限配额带噪闭环；保留现MSE/globalV与80/(1+5e)，分场景归一化仍仅作对照",
     "online_final_relationship": "共同测试指同一评测阶段各队一致；在线榜与终评是否复用完全同一案例集尚未由用户指定，不自行新增一套宇宙",
     "coverage_quality": "覆盖使候选规律可被辨别的空间与时间变化，避免只用极短窗、狭窄距离、近匀速弱作用或单一运动形态；具体选择仅指挥部内部保存，不公开逐宇宙机制标签",
     "numeric_boundaries_and_disclosure": "用户明确等待讨论完成后再冻结；本轮试做区域和样例不是对参赛者的最终范围承诺"
@@ -394,5 +396,7 @@
     "response_boundary": "只序列化协议允许观测/已知初态/配额，不返回真实力函数、隐藏源状态、私有对象或含敏感内部信息的堆栈"
   },
   "framework_reuse_policy": "用户明确：除统一被动探针、observe/launch分工、第一束光、配额等已定差异，优先改造DP已有框架和数据流；不无故自创额外流程，逐项检查是否适合人类竞赛的隔离与客观评分",
-  "observation_noise_contract": "observation_noise.json"
+  "observation_noise_contract": "observation_noise.json",
+  "runtime_contract": "runtime.json",
+  "outer_submission_contract": "submission.schema.json"
 }

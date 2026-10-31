@@ -1,16 +1,18 @@
 {
-  "review_version": "1.6.0",
+  "review_version": "1.9.0",
   "review_date": "2026-10-31",
-  "scope": "实现前审查及已实现私有数值/带噪配额/评分/白名单传输试做；正式服务、模型能力及最终范围仍未验收",
+  "scope": "正式比赛运行系统构建与本地工程验收；现有物理/计分保留，远端Linux/GPU/权限/容量及正式profile未验收",
   "basis": {
     "statement": "docs/彼岸物理规律发现挑战赛_赛题说明.docx",
-    "exploration": "3.7.0",
+    "exploration": "3.8.0",
     "claims": "4.0.0",
-    "scoring": "draft-3.7.0",
+    "scoring": "draft-3.10.0",
     "numerics": "1.1",
     "feedback": "1.0.0",
     "observation_noise": "1.0.0",
-    "law_api": "1.0.0"
+    "law_api": "1.0.0",
+    "runtime": "1.1.0",
+    "submission": "1.0.0"
   },
   "implementation_ready": false,
   "constant_policy_review": {
@@ -75,7 +77,7 @@
       "issue": "参赛者从开赛起所有有效正式提交都评测并更新最佳完整成绩，不设置不计榜单练习模式；练习仅指挥部内部联调。榜与终评是否换案例未指定",
       "impact": "固定宇宙可能被跨提交记住；不能把重复同一实例的改进等同对新宇宙的发现泛化",
       "minimum_resolution": "实现独立单次评分与独立的最佳成绩汇总，不拼接各宇宙历史最好分；正式九宇宙源码保持私有。其余实例/持久化边界后续另定",
-      "status": "部分明确：独立提交和最佳完整成绩已定，榜单/终评测试集关系待后续"
+      "status": "无独立参赛练习阶段；仅本队合法产物可导出用于后续开发/训练"
     },
     {
       "id": "A04",
@@ -118,7 +120,7 @@
       "issue": "最新分工为law.py加速度回调+队伍本地/指挥部正式固定推演；不采用旧JSON表达式或law内部predict积分。统一metadata、case、输出顺序和错误归类已实现",
       "impact": "无法直接编写稳定校验器，可能有巨大数组或隐藏对象列表以及覆盖已知初态的问题",
       "minimum_resolution": "law_api1.0、law_case.schema、公开loader/CLI/worker、配对冻结与私有评测桥已提供；格式预检不判科学正确性；完整服务/镜像仍需集成",
-      "status": "候选接口、格式和代表性数值/worker一致性已验证；远端生产运行未验收"
+      "status": "候选接口、外层manifest、客户端/服务/配对提交与代表性本地闭环已实现；远端未验收"
     },
     {
       "id": "A07",
@@ -220,7 +222,8 @@
       ],
       "issue": "是否允许用官方在线观测更新权重、不同宇宙/提交之间保留记忆或定律文件、发现数据是否可带回开发区尚未明确",
       "impact": "同一策略可能被一队理解为合法在线学习，另一队理解为违规使用隐藏数据；固定世界更容易跨次复用答案",
-      "minimum_resolution": "分别规定开发训练、评测内优化和跨会话持久化，确定允许输出/保留的攻坚组自产数据，不把组委会拟合器偷偷补全的隐藏信息提供给参赛者"
+      "minimum_resolution": "实现受控本队产物出口；每次仍独立新会话/配额/完整评分，不拼接历史成绩，也不向队伍归还隐藏真值或分项",
+      "status": "用户已明确允许跨提交复用本队合法观测、候选规律和白名单模型成果"
     },
     {
       "id": "A14",
@@ -235,7 +238,7 @@
       "issue": "智能体只允许访问指挥部指定的官方IPC或受控内部HTTP JSON通道，其作用是发送实验请求和接收观测；禁止互联网和外部API。law.py保持纯计算、不得联网",
       "impact": "正常SDK可能被禁网阻断，或实现只靠提示词保密而无法隔离真实模拟器和评测记录",
       "minimum_resolution": "HTTP仅传公开请求/允许观测；真实模拟器独立于不可信参赛/候选进程，不暴露私有文件或内存。官方积分器与私有真值引擎分开，正式执行可信冻结版本；不移植DP同进程exec隔离方式",
-      "status": "官方通信例外已明确，执行隔离仍待实现"
+      "status": "客户端/私有服务与断网Docker命令构造已实现，Unix socket及实际权限仍待Linux验收"
     }
   ],
   "suggested_next_steps_not_frozen": [
@@ -245,7 +248,7 @@
     "把通过闭环的公共接口扩展到九世界，再做数值/信息配额/算力/榜单区分度校准",
     "保留25年参考的固定Agent入口、统一eval与可改/不可改边界，但不声称参考附件已包含全部训练数据或现场验收"
   ],
-  "verification_scope": "仅设计契约与格式/边界核对；背景/验证原则已明确，完整schema、SDK、私有服务、GPU及远端流程未实现或验收",
+  "verification_scope": "公开SDK/外层清单与起步包、私有会话/九界调度/固定预测/队列/榜单已做本地协议与进程检查；不是模型能力或正式部署结论",
   "confirmed_this_turn": [
     "节约仅按预言分>=40判断，与定律分无关",
     "正式提交各次独立完整计分，榜单与结算取最佳完整提交，截止无有效提交记0",
@@ -277,6 +280,22 @@
     "program_submission_alignment": "旧JSON式校准保留历史；新增正式law.py入口，指挥部owns积分。正式权限/控制台/榜单/远端仍待集成",
     "formal_law_sdk": "implemented_and_tested_law_api_1.0.0",
     "formal_law_worker": "implemented_known_truth_and_transport_regression_passed",
-    "paired_law_claims_store": "implemented_static_atomic_pair_checks_passed"
+    "paired_law_claims_store": "implemented_static_atomic_pair_checks_passed",
+    "formal_console_service": "implemented_local_transport_tests",
+    "nine_world_job_runner": "implemented_local_process_tests",
+    "queue_leaderboard": "implemented_persistent_scoped_queue_and_exact_tiebreak",
+    "public_starter": "allowlisted_independent_extract_smoke_passed",
+    "target_linux_deployment": "pending"
+  },
+  "score_scale_revision": {
+    "confirmed_formula": "P=80/(1+5e)",
+    "scope": "仅改变预言映射系数；已有MSE、globalV、80/15/5、P>=40、配额与反馈保持",
+    "validation": "复用既有结果算术重算、计分边界及元数据一致性检查；不新增模型试验或物理仿真",
+    "reference_reuse": "新内部profile仅继承原已冻结真值数组与收敛证据，不把元数据迁移当作重新生成或重新验证"
+  },
+  "saving_tie_revision": {
+    "rule": "同分比较同次九宇宙加权C，低者先，仍同并列",
+    "implementation": "runner显式传C，SQLite私有持久化；公开仅总分/九界总分；旧缺C行拦榜并提供既有结果身份核验回填CLI",
+    "validation": "针对性计分/排序/迁移/公开字段测试；无新模型、真实实验、积分或参考生成"
   }
 }

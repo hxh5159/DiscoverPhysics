@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shore:submission:1.0.0",
+  "title": "攻坚组智能体提交清单",
+  "description": "外层清单只声明启动命令与模型来源；不运行程序、不验证科学正确性。真实检查器见rift/submission.py。镜像摘要、硬件、网络和挂载由指挥部可信运行器管理，不从清单授予权限。",
+  "type": "object",
+  "required": ["schema_version", "submission_id", "team_id", "version", "entrypoint", "models"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "submission_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"},
+    "team_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"},
+    "version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "entrypoint": {
+      "description": "直接执行的argv数组；不接受shell命令字符串或shell包装入口，运行器使用shell=False。工作目录固定为本次提交目录。",
+      "type": "array", "minItems": 1,
+      "items": {"type": "string", "minLength": 1, "maxLength": 4096}
+    },
+    "models": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["base_model", "path"], "additionalProperties": false,
+        "properties": {
+          "base_model": {
+            "type": "string",
+            "enum": ["Qwen3.8-27B", "GLM-4.7-Flash", "Qwen3.6-35B-A3B", "Kimi-Linear-48B-A3B-Instruct", "GLM-4.5-Air-FP8", "Qwen3.5-122B-A10B-FP8", "DeepSeek-V4-Flash", "MiniMax-M2.5", "Qwen3.5-397B-A17B-FP8"]
+          },
+          "path": {
+            "type": "string", "minLength": 1, "maxLength": 1024,
+            "description": "包内POSIX相对路径，或指挥部只读挂载的/models/...容器路径。不得含..、反斜线、冒号或隐式host挂载。实际语义由公开检查器验证。"
+          },
+          "revision": {"type": "string", "minLength": 1, "maxLength": 256},
+          "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"},
+          "adaptation": {"enum": ["base", "quantized", "sft", "rl", "other"]}
+        }
+      }
+    }
+  }
+}

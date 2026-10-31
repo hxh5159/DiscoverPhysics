@@ -1,0 +1,60 @@
+裂隙控制台客户端 1.0.0
+
+用途与边界
+
+rift.Console只传递指挥部允许的实验请求、观测和提交文件，不含真实宇宙实现。
+控制台实验由指挥部私有服务执行；队伍本地候选推演仍使用公开rift.rollout。
+同一个会话由指挥部配置的凭据绑定，客户端不能自行选择或重置宇宙和配额。
+
+启动配置
+
+    from rift import Console, ConsoleError
+    console = Console()
+    mission = console.mission()
+
+启动器注入RIFT_CONSOLE_URL和RIFT_SESSION_TOKEN，不应把令牌写入日志或提交说明。
+可通过Console(endpoint=..., token=..., timeout=...)显式配置，参数优先于环境变量。
+Linux隔离运行使用unix:///run/rift/console.sock；诊断可用完整HTTP地址，
+例如http://127.0.0.1:8000/v1/console。两种传输使用相同的POST /v1/console协议。
+HTTP客户端不使用环境代理、不跟随重定向；HTTPS使用系统证书校验。
+不提供自行联网的权限，实际可访问范围由指挥部运行环境控制。
+
+操作
+
+    mission = console.mission()
+    sky = console.observe(times=[0.0, 0.5, 1.0])
+    experiment = console.launch(
+        t_launch=0.0, readout=[0.0, 0.5, 1.0],
+        source_properties={},
+        probes=[{"pos":[1.0,0.0], "vel":[0.0,0.1], "properties":{}}],
+    )
+    data = console.archive()          # 仅返回已获得的公开记录
+    console.archive("data/")        # 同时在本地导出JSON和CSV
+    console.save_draft(law="law.py", claims="claims.json")
+    console.submit(law="law.py", claims="claims.json", report="report.md")
+
+示例数值只展示格式，不保证属于某个正式任务的合法范围；以mission目录为准。
+观测时刻、配额、合法区域、属性和只读数量仍由服务端按现行规则检查。
+NumPy数值和数组可作为普通请求数据，发送时转换为JSON标量与列表。
+
+archive(path)生成archive.json和archive.csv。JSON保留服务端返回的完整公开档案；
+CSV每行是一条第一束光或观测记录，包含record_type、record_index、record_json。
+JSON列保留数组、时间、初态和属性，不把嵌套数据错误展开或丢弃；可用json.loads解析。
+读取档案不重新运行实验、不重新抽噪声；本地导出失败也不会产生新的实验。
+
+save_draft/submit读取本地law.py和claims.json的原始字节，以base64传输；
+submit可附report。服务器检查双方格式后配对冻结。坏提交不覆盖旧有效配对。
+客户端不预判声明科学正误，不获取隐藏测试轨迹或分项评分。
+
+传输与错误
+
+请求为{protocol_version:"1.0.0",method:方法名,params:参数对象}，
+Authorization使用Bearer会话令牌。
+成功返回{ok:true,result:公开结果}；失败返回{ok:false,error:{code,path,message}}。
+ConsoleError提供code、path、message与as_dict()，不把远端原始响应或堆栈直接展示。
+默认timeout=None；整个探索窗口仍由指挥部独立墙钟管控。
+如显式设置timeout，它仅是HTTP/Unix通信护栏，不改变物理时间或计分时间。
+客户端不自动重试请求。通信超时抛出transport_error，不表示科学预测失败，
+也不能据此断言服务端尚未处理请求；复杂重试计费政策仍以正式运行规则为准。
+
+正式部署、资源限额及会话服务的验收情况另见指挥部说明。本客户端本身不保证权限隔离。
