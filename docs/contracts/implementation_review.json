@@ -1,12 +1,12 @@
 {
-  "review_version": "1.9.0",
-  "review_date": "2026-10-31",
-  "scope": "正式比赛运行系统构建与本地工程验收；现有物理/计分保留，远端Linux/GPU/权限/容量及正式profile未验收",
+  "review_version": "1.10.0",
+  "review_date": "2026-11-01",
+  "scope": "正式比赛运行系统构建与本地工程验收；预言映射统一恢复10e，其他物理与计分规则保留，远端Linux/GPU/权限/容量及正式profile未验收",
   "basis": {
     "statement": "docs/彼岸物理规律发现挑战赛_赛题说明.docx",
     "exploration": "3.8.0",
     "claims": "4.0.0",
-    "scoring": "draft-3.10.0",
+    "scoring": "draft-3.11.0",
     "numerics": "1.1",
     "feedback": "1.0.0",
     "observation_noise": "1.0.0",
@@ -288,7 +288,7 @@
     "target_linux_deployment": "pending"
   },
   "score_scale_revision": {
-    "confirmed_formula": "P=80/(1+5e)",
+    "confirmed_formula": "P=80/(1+10e)",
     "scope": "仅改变预言映射系数；已有MSE、globalV、80/15/5、P>=40、配额与反馈保持",
     "validation": "复用既有结果算术重算、计分边界及元数据一致性检查；不新增模型试验或物理仿真",
     "reference_reuse": "新内部profile仅继承原已冻结真值数组与收敛证据，不把元数据迁移当作重新生成或重新验证"

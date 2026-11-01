@@ -63,7 +63,7 @@ submission.schema.json                 外层submission.json的格式。
 exploration_protocol.json              操作、配额、第一束光、时间及探索边界。
 numerics.json                          固定积分器、步长、采样和数值约定。
 observation_noise.json                 观测加噪规则；评分真值不加观测噪声。
-scoring.json                           现行80/(1+5e)、80/15/5及同分规则。
+scoring.json                           现行80/(1+10e)、80/15/5及同分规则。
 feedback.schema.json                   公开成绩反馈结构，不含分项正误。
 runtime.json                           启动、会话、九宇宙运行及截止规则。
 implementation_review.json             实施审查与尚待验收的事项。
