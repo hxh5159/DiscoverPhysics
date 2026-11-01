@@ -144,12 +144,28 @@
 | --- | --- |
 | 远端项目目录 | `/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/DiscoverPhysics` |
 | 远端自下载模型目录 | `/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/models` |
+| 当前统一模型目录（2026-11-01） | `/inspire/hdd/project/26-the-other-shore/public/models`；用户要求将指定七个模型复制到此处，供参赛者和指挥部共同使用。今后相关命令优先引用此根目录；尚未回传复制完成，不声称已存在或已验证模型可运行 |
+| 本轮复制源根目录 | `/inspire/hdd/global_public/public_models/Qwen`；完整七项源与目标映射见下表，不移动或删除原模型 |
 | 用户已指定的公共模型路径 | `/inspire/hdd/global_public/models/Qwen3.6-35B-A3B-W8A8` |
 | 对应模型名称 | `Qwen3.6-35B-A3B-W8A8`；此为用户提供的已有模型路径，不是另行新增白名单底座 |
 | 本地编辑目录 | `C:\Users\hwz\Desktop\秋\26秋\DiscoverPhysics` |
 | 代码同步来源 | 用户的 GitHub 仓库 `hxh5159/DiscoverPhysics` |
 | 同步节点 | 自2026-11-01起，修改仓库后完成相应检查即自动Git commit并推送至对应origin，不再等额外提醒；无改动不空提交。用户明确要求仅本地保存或暂停推送时除外 |
 | 私有测试资料同步 | `hxh5159/test`，保持private；本地`../test-assets`，用户远端实际克隆路径`/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/test`。真实模拟器、真值和测试工作流不得因自动同步进入公开主仓库 |
+
+**统一模型目录的七项清单（2026-11-01用户指定）：** 下列每行的源路径为 `/inspire/hdd/global_public/public_models/Qwen/<目录名>`，目标为 `/inspire/hdd/project/26-the-other-shore/public/models/<目录名>`。用户后六项未写开头的`/`，按绝对路径补齐；目录名不自行改写，尤其第三项确为`Qwen-3.6-35B-A3B-FP8`。
+
+| 目录名 | 来源及后续用途 |
+| --- | --- |
+| `Qwen3.8-27B` | 用户准备提供给参赛者，指挥部亦从统一目标目录调用 |
+| `Qwen3.6-35B-A3B` | 同上 |
+| `Qwen-3.6-35B-A3B-FP8` | 同上；保留`Qwen-3.6`中的连字符 |
+| `Qwen3.5-122B-A10B` | 同上 |
+| `Qwen3.5-122B-A10B-FP8` | 同上 |
+| `Qwen3.5-397B-A17B` | 同上 |
+| `Qwen3.5-397B-A17B-FP8` | 同上 |
+
+本次只确认复制清单和后续首选模型目录，不由此推断项目代码目录已迁移，也不以模型文件夹名证明权重精度、来源、配置、许可证或vLLM兼容性；原白名单和历史测试包不自动改写。
 
 **给出命令与实现时：**
 
@@ -1188,6 +1204,8 @@ N-body 与网格场后端有边界、平滑和离散方式的差异，不能默�
 
 
 ## 12. 变更记录
+
+| 2026-11-01 | 用户指定七个模型从global_public/public_models/Qwen复制至26-the-other-shore/public/models，参赛者和指挥部后续共用该目标根目录；保留全部目录原名并补齐绝对路径开头斜杠，复制尚待远端执行，不推断项目目录迁移。 |
 
 | 2026-11-01 | 设计六公开宇宙及一隐藏一级替代，建立独立数值/控制台/law.py评测原型并验证；正式旧v6及说明未切换，记录中心穿越数值边界与待接入项，见7.66。 |
 
