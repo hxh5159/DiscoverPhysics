@@ -1,0 +1,96 @@
+{
+  "status": "finite_case_numeric_design_check",
+  "model_calls": 0,
+  "worlds": {
+    "1": {
+      "prediction": 80.0,
+      "law": 15,
+      "saving": 4.0,
+      "total": 99.0,
+      "raw_MSE": 0.0,
+      "max_convergence_dx": 1.629393733611134e-11,
+      "ballistic_P": 11.969738021399106
+    },
+    "2": {
+      "prediction": 80.0,
+      "law": 15,
+      "saving": 4.0,
+      "total": 99.0,
+      "raw_MSE": 0.0,
+      "max_convergence_dx": 2.8698662058102793e-11,
+      "ballistic_P": 0.7498830235955414
+    },
+    "3": {
+      "prediction": 80.0,
+      "law": 15,
+      "saving": 4.0,
+      "total": 99.0,
+      "raw_MSE": 0.0,
+      "max_convergence_dx": 2.4483450464245784e-11,
+      "ballistic_P": 0.6925391070530083
+    },
+    "4": {
+      "prediction": 80.0,
+      "law": 15,
+      "saving": 4.0,
+      "total": 99.0,
+      "raw_MSE": 0.0,
+      "max_convergence_dx": 1.464961013554111e-08,
+      "ballistic_P": 6.0113834575388
+    },
+    "5": {
+      "prediction": 80.0,
+      "law": 15,
+      "saving": 4.0,
+      "total": 99.0,
+      "raw_MSE": 0.0,
+      "max_convergence_dx": 2.7602753463817585e-10,
+      "ballistic_P": 0.5920702984383062
+    },
+    "6": {
+      "prediction": 80.0,
+      "law": 15,
+      "saving": 4.0,
+      "total": 99.0,
+      "raw_MSE": 0.0,
+      "max_convergence_dx": 3.9665128677640946e-11,
+      "ballistic_P": 1.0439646313991682
+    }
+  },
+  "mechanism_ablations": {
+    "3": {
+      "P": 7.8228515878587395,
+      "scope": "fixed mechanism removal; amplitudes not refitted; not best possible shortcut"
+    },
+    "4": {
+      "P": 8.07434171730359,
+      "scope": "fixed mechanism removal; amplitudes not refitted; not best possible shortcut"
+    },
+    "5": {
+      "P": 14.087521158340186,
+      "scope": "fixed mechanism removal; amplitudes not refitted; not best possible shortcut"
+    },
+    "6": {
+      "P": 6.9860295505071015,
+      "scope": "fixed mechanism removal; amplitudes not refitted; not best possible shortcut"
+    }
+  },
+  "scoring_arithmetic_cross_check": true,
+  "host_failure_not_scored": true,
+  "limits": [
+    "Known correct functions, not blind scientific discovery.",
+    "No noise-based fitting or whitelist model capability check.",
+    "Worlds 1/4 have nonconvergent radial origin-crossing cases outside these validation samples.",
+    "Mechanism ablations hold remaining coefficients fixed; not an optimal shortcut search."
+  ],
+  "source_sha256": {
+    "development_worlds/worlds.py": "576f3700e583682e63b56177d73046a6e8c728c33251aaeb8424630f7ab873e6",
+    "development_worlds/catalog.py": "9e7b0381e35b3f29db5412b3cd3ad49f4084b638c5cde90714da2266bcf4bf72",
+    "development_worlds/evaluation.py": "b2de0e9fff5acffc0421d1f5c9b5a92164e21be1d005862b80efd6afa16757ce",
+    "rift/law.py": "4b67838fadf4ae9deb0c685619262aa84252b2ded3d3cc8348df6987cd8f96d6",
+    "rift/observations.py": "e9d7e615cb4583745378c2690b1997dbd95eaf5491c85420409e368becc3e0b9",
+    "rift/prediction.py": "ec153830614b1fca15f03f0f85eae1cc82f591589fc42cc58a3ba9735215e2eb",
+    "rift_numerics/__init__.py": "22f601b805724c8fd7ea68c21d742445260fde494135c023c089820e91dbcd73",
+    "rift_numerics/rollout.py": "76dac8e186332c101c41b67829f175b99c970a2819397bc0877d75e6ebcbe414"
+  }
+}
