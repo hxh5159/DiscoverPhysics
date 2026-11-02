@@ -11,6 +11,9 @@ SCRIPTS='/opt/shore-image-tools'
 INDEX_URL="${SHORE_PIP_MIRROR:-}"
 TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 PLAN=0
+DEPENDENCIES_ONLY=0
+# These independent environment helpers share a fixed, previously published revision.
+DEPENDENCY_SOURCE_REF='9f18d633dad0057ab1b385fad21333225b3ce911'
 PHASE='解析参数'
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
@@ -27,11 +30,12 @@ trap 'failed "$?" "$LINENO"' ERR
 usage() {
     printf '%s\n' \
         'Usage: bash prepare_cpu_h200.sh --index-url URL --trusted-host HOST' \
-        '       [--base-dir /absolute/shared/project/directory] [--plan]' \
+        '       [--dependencies-only] [--base-dir /absolute/project/directory] [--plan]' \
+        '--dependencies-only installs under /opt without accessing project/model paths or test bundles.' \
         'The default base contains sibling DiscoverPhysics and test repositories.' \
         'Mirror values may also come from SHORE_PIP_MIRROR/SHORE_PIP_MIRROR_HOST.' \
         '--plan prints paths without network, mkdir, package installation or GPU checks.' \
-        'Requires Linux, findmnt, and an existing Conda installation; run on the connected CPU instance.'
+        'Requires Linux and an existing Conda installation; full project preparation also requires findmnt.'
 }
 
 while [ "$#" -gt 0 ]; do
@@ -46,6 +50,7 @@ while [ "$#" -gt 0 ]; do
             esac
             shift 2 ;;
         --plan) PLAN=1; shift ;;
+        --dependencies-only) DEPENDENCIES_ONLY=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) die "未知选项：$1；使用--help查看用法。" ;;
     esac
@@ -69,7 +74,12 @@ printf '%s\n' \
     "测试包：$TESTROOT" \
     "环境：$ENVROOT" \
     "工具链：$TOOLROOT" \
-    "镜像脚本：$SCRIPTS"
+    "检查脚本：$SCRIPTS"
+if [ "$DEPENDENCIES_ONLY" -eq 1 ]; then
+    printf '模式：仅安装依赖和离线资源，不访问或创建项目/模型目录。\n'
+else
+    printf '模式：完整项目准备，需要项目共享盘。\n'
+fi
 
 if [ "$PLAN" -eq 1 ]; then
     printf '\nPLAN ONLY: 未检查GPU、未创建目录、未联网、未安装依赖。\n'
@@ -86,6 +96,7 @@ esac
    "$TRUSTED_HOST" != *$'\n'* && "$TRUSTED_HOST" != *$'\r'* ]] || \
     die '索引参数不能含换行。'
 
+if [ "$DEPENDENCIES_ONLY" -eq 0 ]; then
 stage '1/7 检查项目共享盘'
 command -v findmnt >/dev/null || die '缺少findmnt，请在CPU实例安装或加载util-linux。'
 
@@ -118,6 +129,9 @@ if [ ! -d "$BASE" ]; then
     mkdir -p -- "$BASE"
 fi
 check_shared_mount "$BASE"
+else
+    stage '1/7 仅准备依赖，跳过项目共享盘和模型目录检查'
+fi
 mkdir -p -- "$SCRIPTS"
 
 stage '2/7 查找Conda并安装CUDA12.8工具链'
@@ -150,6 +164,25 @@ export GIT_TERMINAL_PROMPT=0
 "$CXX" --version
 if command -v uv >/dev/null; then uv --version; fi
 
+if [ "$DEPENDENCIES_ONLY" -eq 1 ]; then
+    stage '3/7 获取独立环境安装与检查脚本'
+    for name in bootstrap_cuda128.sh prepare_h200_offline_cache.py verify_h200_cuda128.py; do
+        temporary="$(mktemp "$SCRIPTS/.${name}.download.XXXXXXXX")"
+        curl -fL --retry 3 --connect-timeout 30 \
+            "https://raw.githubusercontent.com/hxh5159/DiscoverPhysics/$DEPENDENCY_SOURCE_REF/scripts/$name" \
+            -o "$temporary"
+        if [[ "$name" == *.sh ]]; then
+            bash -n "$temporary"
+        else
+            "$TOOLROOT/bin/python" -c \
+                'import ast,pathlib,sys; ast.parse(pathlib.Path(sys.argv[1]).read_text(encoding="utf-8"))' \
+                "$temporary"
+        fi
+        mv -- "$temporary" "$SCRIPTS/$name"
+    done
+    printf '%s\n' "$DEPENDENCY_SOURCE_REF" > "$SCRIPTS/dependency-source-commit.txt"
+    stage '4/7 跳过仓库同步和测试包解压，仅安装运行依赖'
+else
 stage '3/7 克隆或更新主项目和测试资料仓库'
 sync_public_repo() {
     local url="$1" target="$2"
@@ -180,9 +213,10 @@ for name in bootstrap_cuda128.sh prepare_h200_offline_cache.py verify_h200_cuda1
     cp -- "$PROJECT/scripts/$name" "$SCRIPTS/"
 done
 git -C "$PROJECT" rev-parse HEAD > "$SCRIPTS/project-commit.txt"
+fi
 
 stage '5/7 安装实验依赖并从源码构建H200推理环境'
-cd "$PROJECT"
+if [ "$DEPENDENCIES_ONLY" -eq 1 ]; then cd "$SCRIPTS"; else cd "$PROJECT"; fi
 bash "$SCRIPTS/bootstrap_cuda128.sh" \
     --cpu-build-for h200 --env-root "$ENVROOT" \
     --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST"
@@ -196,6 +230,6 @@ PY="$ENVROOT/.venv-trial/bin/python"
 stage '7/7 检查CPU准备结果'
 [ -f "$ENVROOT/activate_h200_offline.sh" ] || die '缺少H200离线激活脚本，不能视为准备完成。'
 "$PY" -c 'import sys,numpy,scipy; print(sys.executable); print(numpy.__version__,scipy.__version__)'
-printf '\nCPU准备完成。请在平台保存当前实例镜像，并完整保留：\n'
+printf '\n依赖与离线资源准备完成。环境和检查脚本目录：\n'
 printf '%s\n' "$ENVROOT" "$TOOLROOT" "$SCRIPTS"
-printf '项目和模型共享盘需在H200实例另行挂载；GPU和模型推理尚未验收。\n'
+printf '下一步可在H200中执行环境验收和模型推理；当前CPU步骤未运行GPU或模型。\n'

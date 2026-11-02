@@ -1,17 +1,18 @@
-从联网CPU准备到无网H200运行的完整命令
+联网CPU依赖安装与无网H200运行命令
 日期：2026-11-03
 
-固定目录：
+固定目录（项目、测试包和模型路径用于运行端）：
   主项目 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics
   测试仓库 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/test
   指挥部测试解压 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/shore-organizer-open-model-test-20261101
   模型 /inspire/hdd/project/26-the-other-shore/public/models
   环境 /opt/shore-h200-cu128
   CUDA/GCC工具链 /opt/shore-h200-toolchain
-  保存的准备/校验脚本 /opt/shore-image-tools
+  安装及校验脚本 /opt/shore-image-tools
 
-一、联网CPU阶段
-可从任意当前目录开始，脚本会明确进入共享盘BASE/PROJECT。
+一、联网CPU安装依赖
+可从任意当前目录开始。推荐的--dependencies-only模式只安装/opt下的依赖、
+工具链和离线运行资源，不要求项目或模型共享盘已经挂载，也不创建BASE项目目录。
 先按会话提供的真实内网索引export SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST，
 以下命令保留环境变量，不在公开文档写入平台内部DNS。pip安装均由现行bootstrap使用
 env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null的格式执行。
@@ -20,8 +21,8 @@ Conda用NVIDIA cuda-12.8.1标签固定12.8补丁版本；不是安装GPU驱动�
 Conda优先使用当前CONDA_EXE或PATH；找不到时检查原安装位置，不将旧项目目录继续作为源码路径。
 
 推荐使用下列短入口，不再粘贴长heredoc。完整实现位于scripts/prepare_cpu_h200.sh。
-它会明确打印阶段、实际路径和失败原因；BASE缺失时先核实共享挂载再创建，
-不会因裸test -d静默退出，也不会在overlay中创建伪共享目录。
+它会明确打印阶段和失败原因。CPU实例的项目路径属于overlay，不妨碍这个依赖安装模式。
+不带--dependencies-only的完整模式仍要求真实项目共享挂载，并额外同步仓库及准备测试包。
 
 # 先按会话提供的值设置SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST。
 # 下载成功后才执行，避免网络失败时误运行旧的临时文件。
@@ -29,20 +30,18 @@ curl -fL --retry 3 \
   'https://raw.githubusercontent.com/hxh5159/DiscoverPhysics/main/scripts/prepare_cpu_h200.sh' \
   -o /tmp/shore-prepare-cpu-h200.sh &&
 bash /tmp/shore-prepare-cpu-h200.sh \
+  --dependencies-only \
   --index-url "${SHORE_PIP_MIRROR:?请先设置SHORE_PIP_MIRROR}" \
   --trusted-host "${SHORE_PIP_MIRROR_HOST:?请先设置SHORE_PIP_MIRROR_HOST}"
 
 # 只查看配置而不安装时，在上面bash命令末尾添加 --plan。
 
-二、在平台保存镜像
+二、无网H200运行六公开宇宙
 
-上段全部成功后，在平台界面保存当前CPU实例镜像；没有可凭空推定的平台保存命令。
-保留完整/opt/shore-h200-cu128、/opt/shore-h200-toolchain、/opt/shore-image-tools，
-包括虚拟环境所链接的managed Python、编译器与离线缓存，不只拷贝site-packages。
-用此镜像启动同节点4H200实例；重新挂载相同绝对路径的项目盘及模型盘。
-共享盘内容不依赖镜像保存，不将模型复制进镜像。仅为H200/SM90编译的镜像不能直接给4090用。
-
-三、无网H200阶段
+运行端需具有上面三个/opt完整环境目录，以及指定路径下的主项目和模型。
+--dependencies-only不克隆主项目或test、不解压宇宙测试包；运行材料须另行准备就绪，
+不能等到无网H200阶段再下载。仅为H200/SM90编译的环境不能直接给4090用。
+项目固定路径是运行时的位置，不是CPU安装依赖的前置条件。
 
 这一步不执行git、pip或Conda，不重新下载代码/模型。可以从任意目录启动，脚本会cd到PROJECT。
 默认27b；可在执行前export SHORE_MODEL=35b/35b-fp8/122b/122b-fp8/397b-fp8。
@@ -108,10 +107,10 @@ with managed_model(model, model_root=root, python_executable=model_python,
 print('结果：'+str(run/'six-public'/'summary.json'))
 PY
 
-四、可选：指挥部九隐藏完整测试
+三、可选：指挥部九隐藏完整测试
 
-平台保存镜像不等于Docker本地镜像。此分支需要平台已支持Docker/NVIDIA容器、
-可被docker image inspect识别的离线基础镜像（其中已有/opt环境），并且四GPU空闲。
+此分支需要已可用的Docker/NVIDIA容器、可被docker image inspect识别的离线基础镜像
+（其中已有/opt环境），以及指定路径下完整的test仓库和已解压H200测试包，并且四GPU空闲。
 先停止六公开共享服务释放GPU。设置LOCAL_BASE_IMAGE为实际本地镜像tag/ID，不填写假sha256。
 上述条件不是单纯安装Python依赖可创造的；若平台不支持嵌套Docker，应由平台提供等价隔离端。
 下面是指挥部内部测试数据库，不是正式榜单，不需要虚构48小时正式截止时间。
