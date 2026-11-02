@@ -1,0 +1,48 @@
+模型、环境与镜像的对应关系
+
+一、两个Python环境
+
+实验/拟合/控制台：/opt/shore-h200-cu128/.venv-trial/bin/python。
+模型服务：/opt/shore-h200-cu128/.venv-vllm-cu128/bin/python。
+可通过--model-python或SHORE_MODEL_PYTHON明确改变模型Python；不把base环境当作已配置环境。
+当前推理环境为CUDA12.8；新入口scripts/serve_model.py针对同一固定版本，不调用旧启动器。
+
+默认权重根目录：/inspire/hdd/project/26-the-other-shore/public/models。
+七个目录和精度映射见rift/model_catalog.json；35b-fp8兼容已有额外连字符的目录名。
+在正式容器内，指挥部把已登记的具体检查点挂载到/models/<登记目录名>，不复制到参赛ZIP。
+目录别名、服务显示名和精度是不同概念：程序按本地配置与分片头部核查，不能改名字冒充FP8。
+模型已训练或合并时，用其完整推理检查点和准确底座身份登记；提示词等程序变化也须随版本提交。
+
+二、基本启动方式
+
+python scripts/serve_model.py --list
+  只列七个模型配置，不加载权重、不查询GPU。
+python scripts/serve_model.py --model 27b --plan-only
+  只输出路径和启动参数，不要求模型目录存在，不调用GPU或服务。
+python scripts/serve_model.py --model 27b --model-root <本地根目录> --dry-run
+  检查配置及safetensors头部，不读取完整权重、不加载模型。
+python scripts/serve_model.py --model 27b --model-root <本地根目录> --model-python <模型Python>
+  在实际GPU节点启动本地vLLM服务。未提供--base-url时，基础agent也可自动执行此过程。
+
+固定单宇宙600秒从mission之后开始；服务加载有独立startup-timeout。
+客户端只接显式本机服务，不使用环境代理或外部模型回退。服务名称本身不能证明权重来源。
+实际执行会检查四卡容量，397B BF16不能在4H200全GPU常驻；选已有FP8或自行另行验证合规方案。
+低显存或不兼容时明确失败，不静默转换精度。基础命令默认TP4和32K上下文。
+
+三、只读镜像与离线缓存
+
+模型子进程从CPU镜像的构建清单恢复CUDA/编译器/PTX路径。可写HF、vLLM、Triton、
+FlashInfer工作区等放到本次输出目录下.cache；镜像内预下载的cubin/AOT依赖保持只读。
+H200不联网下载模型、包或内核。CPU保存镜像前应完成H200_OFFLINE_SETUP.txt的安装与缓存阶段。
+仅安装包成功不保证实际模型兼容，先做真实生成，再做整套实验。检查报告会区分这两个层级。
+
+四、两类执行镜像和发布配置
+
+agent镜像保存本队程序与运行依赖，用GPU加载模型、实验和生成候选。可修改基础框架后重建。
+candidate镜像只为最终law.py提供固定NumPy/SciPy推演，不用GPU、模型、控制台令牌或私有文件。
+build_runtime_images.py使用已经导入本机的离线基础镜像构建两者，并记录准确镜像ID；不联网安装。
+
+指挥部的发布配置把候选镜像ID、模型宿主路径到/models的只读映射、四GPU和验证参考固定下来。
+agent镜像ID来自各组受理的具体版本，不用一个通用镜像覆盖各组修改。
+模型挂载是路径映射，既不把九宇宙源码放进镜像，也不要求反复上传数百GB基座权重。
+只读容器挂载本身不能冻结宿主文件；指挥部应使用由其控制、版本固定的模型制品目录。

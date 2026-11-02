@@ -1,7 +1,21 @@
-# BASE_IMAGE is an offline official image supplied by the contest organizers.
+# Build with the participant bundle as the build context. BASE_IMAGE is the
+# local offline image prepared on the connected CPU instance, not a remote tag.
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
+ARG SHORE_ENV_ROOT=/opt/shore-h200-cu128
+ENV SHORE_ENV_ROOT=${SHORE_ENV_ROOT}
+ENV SHORE_MODEL_PYTHON=${SHORE_ENV_ROOT}/.venv-vllm-cu128/bin/python
+ENV PATH=${SHORE_ENV_ROOT}/.venv-trial/bin:${SHORE_ENV_ROOT}/.venv-vllm-cu128/bin:${PATH}
 WORKDIR /submission
-COPY . /submission
-ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1
-# The trusted runner provides the public SDK and executes submission.json.
+COPY shore_agent/ /submission/shore_agent/
+COPY rift/ /submission/rift/
+COPY rift_numerics/ /submission/rift_numerics/
+COPY scripts/__init__.py scripts/validate_claims.py /submission/scripts/
+COPY docs/contracts/claims.schema.json /submission/docs/contracts/claims.schema.json
+ARG SUBMISSION_MANIFEST=examples/submission.json
+COPY ${SUBMISSION_MANIFEST} /submission/submission.json
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 HF_DATASETS_OFFLINE=1
+ENV FLASHINFER_NO_DOWNLOAD=1 PYTHONDONTWRITEBYTECODE=1
+# Add the team's own modules/configuration with explicit COPY instructions.
+# The trusted runner mounts the fixed SDK and read-only model artifacts, then
+# executes the argv from submission.json. No private simulator is copied here.

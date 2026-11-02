@@ -12,13 +12,28 @@ PUBLIC_FILES = (
     "LICENSE",
     "rift/__init__.py", "rift/console.py", "rift/submission.py", "rift/law.py",
     "rift/observations.py", "rift/prediction.py", "rift/worker.py",
+    "rift/model_registry.py", "rift/model_catalog.json",
     "rift_numerics/__init__.py", "rift_numerics/rollout.py",
-    "scripts/validate_claims.py", "scripts/validate_law.py", "scripts/validate_submission.py",
+    "shore_agent/__init__.py", "shore_agent/agent.py", "shore_agent/models.py",
+    "shore_agent/tools.py", "shore_agent/tool_worker.py",
+    "development_worlds/__init__.py", "development_worlds/worlds.py",
+    "development_worlds/catalog.py", "development_worlds/console.py",
+    "development_worlds/evaluation.py", "development_worlds/service.py",
+    "development_worlds/runner.py", "development_worlds/README.md",
+    "scripts/__init__.py", "scripts/validate_claims.py", "scripts/validate_law.py", "scripts/validate_submission.py",
+    "scripts/serve_model.py", "scripts/build_runtime_images.py", "scripts/make_submission.py",
+    "scripts/bootstrap_cuda128.sh", "scripts/prepare_h200_offline_cache.py",
+    "scripts/verify_h200_cuda128.py", "requirements.txt",
     "docs/LAW_API.txt", "docs/CONSOLE_API.txt", "docs/SUBMISSION_API.txt", "docs/CONTEST_WORKFLOW.txt",
+    "docs/QUICKSTART.txt", "docs/PARTICIPANT_FILES.txt", "docs/MODEL_RUNTIME.txt", "docs/MODELS.txt",
+    "docs/H200_OFFLINE_SETUP.txt", "docs/CUDA128_SETUP.txt",
     "docs/contracts/claims.schema.json", "docs/contracts/claims.example.json",
     "docs/contracts/law_api.json", "docs/contracts/law_case.schema.json",
     "docs/contracts/numerics.json", "docs/contracts/submission.schema.json", "docs/contracts/runtime.json",
+    "docs/contracts/exploration_protocol.json", "docs/contracts/observation_noise.json",
+    "docs/contracts/scoring.json", "docs/contracts/feedback.schema.json",
     "examples/agent.py", "examples/submission.json", "examples/law.py", "examples/law_case.json", "examples/Dockerfile.agent",
+    "examples/Dockerfile.candidate",
 )
 PUBLIC_NUMERICS_FIELDS = (
     "numerics_version", "integrator", "dt", "dtype", "sampling", "softening",
@@ -26,24 +41,43 @@ PUBLIC_NUMERICS_FIELDS = (
     "freeze_policy", "time_meaning", "background_propagation", "shared_module",
     "prediction_program_protocol", "state_callback",
 )
-START_HERE = '''攻坚组接口起步包
+START_HERE = '''攻坚组开发与实验起步包
 
-请先阅读docs/SUBMISSION_API.txt、CONSOLE_API.txt和LAW_API.txt。
+先阅读docs/QUICKSTART.txt，再看PARTICIPANT_FILES.txt和MODEL_RUNTIME.txt。
+本包包含六公开宇宙、可修改LLM基础框架、固定候选积分器及公开计分程序。
 在已安装NumPy与SciPy的官方环境中，可运行：
   python scripts/validate_submission.py examples/submission.json
   python scripts/validate_law.py examples/law.py --claims docs/contracts/claims.example.json
   python scripts/validate_law.py examples/law.py --case examples/law_case.json --execute
 
-启动入口示例位于examples/agent.py，只验证交互和提交格式，不进行模型推理或规律发现。
-要按examples/submission.json启动，应把examples目录作为提交工作目录，并确保公开SDK可导入。
-控制台地址、会话令牌和产物目录由可信运行器提供，不在这个包中预置。
-正式模型权重、基础镜像、测试配置和完整比赛接入方式由指挥部随环境发布。
-本包不含正式宇宙的真实模拟器或隐藏验证真值，接口示例不新增参赛练习阶段。
-公开数值说明仅包含有效操作约定；原研究记录和历史比较不随包发布。
+模型准备后，从本包根目录运行python -m development_worlds.runner --help。
+实际默认入口python -m shore_agent.agent会加载所选本地模型并自动探索；没有模型就明确报错。
+公开开发驱动和正式驱动使用相同Console及law.py/claims.json提交接口。
+提交根目录为包含shore_agent、rift和提交清单的完整工作区，不再只复制examples目录。
+正式控制台地址、会话令牌及模型只读挂载由指挥部运行器提供。
+本包不含正式九宇宙的真实模拟器、定律参数或隐藏验证真值，也不附带权重和凭证。
+六公开运行的观测及日志可保留；九隐藏运行材料由指挥部保留，赛中只返回规定成绩和必要错误。
 '''
+
+PUBLIC_EXPLORATION_FIELDS = (
+    "protocol_version", "updated", "scoring_contract", "feedback_contract",
+    "evaluation_feedback", "mission", "time_model", "first_light", "launch_request",
+    "probe_model", "readout_semantics", "exploration_limits", "fitting", "submission",
+    "common_claim_semantics", "submission_evaluation", "evaluation_resources",
+    "development_support", "communication_policy", "experimental_error_handling",
+    "background_prediction", "candidate_metadata_explanation", "private_simulator_boundary",
+    "observation_noise_contract", "observation_noise_version", "runtime_contract",
+    "outer_submission_contract",
+)
 
 
 def _public_bytes(relative, data):
+    if relative == "docs/contracts/exploration_protocol.json":
+        source = json.loads(data.decode("utf-8-sig"))
+        public = {key: source[key] for key in PUBLIC_EXPLORATION_FIELDS if key in source}
+        if "launch_request" in public:
+            public["launch_request"]["semantics"] = "数组每项是共享顶层时间安排及源侧控制的一枚探针；不同顶层安排采用不同调用"
+        return (json.dumps(public, ensure_ascii=False, indent=2)+"\n").encode("utf-8")
     if relative == "docs/contracts/numerics.json":
         source = json.loads(data.decode("utf-8-sig"))
         public = {key: source[key] for key in PUBLIC_NUMERICS_FIELDS if key in source}
@@ -79,9 +113,11 @@ def build_starter(output, *, root=ROOT, overwrite=False):
     payloads["START_HERE.txt"] = START_HERE.encode("utf-8")
     inventory = [{"path": path, "sha256": hashlib.sha256(data).hexdigest()}
                  for path, data in sorted(payloads.items())]
-    manifest = {"starter_schema_version": "1.0.0", "contains_formal_world_simulators": False,
+    manifest = {"starter_schema_version": "1.1.0", "contains_formal_world_simulators": False,
+                "contains_public_development_worlds": True, "public_worlds": ["1", "2", "3", "4", "5", "6"],
+                "contains_editable_llm_baseline": True,
                 "contains_model_weights": False, "files": inventory}
-    manifest["public_contract_projection"] = "Numerics includes normative public fields only; schema identifiers use the participant namespace. Mathematical and validation rules are unchanged."
+    manifest["public_contract_projection"] = "Normative public contracts only; internal design reviews excluded; schema identifiers use the participant namespace. Scoring and numerical rules are unchanged."
     payloads["starter-manifest.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2)+"\n").encode("utf-8")
     output.parent.mkdir(parents=True, exist_ok=True)
     with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:

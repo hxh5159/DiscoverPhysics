@@ -1,0 +1,52 @@
+文件安排与修改范围
+
+本文件路径相对于攻坚组开发包根目录。完整项目仓库和指挥部测试仓库不是参赛发放包。
+
+一、可以修改或替换
+
+shore_agent/__init__.py、agent.py       基础LLM探索主循环、提示词、历史和动作策略。
+shore_agent/tools.py、tool_worker.py   基础候选诊断/参数拟合工具；只能使用合法观测。
+shore_agent/models.py                 基础本地模型接入，可自行改进推理方式。
+examples/agent.py                     转发到基础agent的便利入口，可替换为自己的程序。
+examples/submission.json              启动清单例；实际清单用make_submission.py生成后改本组信息。
+examples/law.py、law_case.json         格式与候选推演示例，不是正式宇宙答案。
+examples/Dockerfile.agent             本队执行镜像模板；可增加自己的模块和配置。
+
+自己的SFT/RL、符号回归、记忆、提示词文件和训练结果可以另放目录，不要求固定命名。
+最终law.py/claims.json由运行中的agent按每个宇宙自动生成并通过控制台提交。
+
+二、公开可见，标准评测使用官方固定版本
+
+rift/、rift_numerics/                  控制台客户端、law格式/输入检查及固定积分器。
+rift/model_registry.py、model_catalog.json
+                                      模型名称、精度和路径登记；别名不改变实际精度。
+scripts/validate_*.py                 格式检查，不判断物理正误。
+docs/contracts/                      实验、时间、噪声、提交、计分和反馈契约。
+development_worlds/worlds.py          六公开宇宙的全部真实数值模拟器。
+development_worlds/catalog.py         六公开操作范围、首光和公开验证条件。
+development_worlds/console.py         带噪声与配额的标准开发实验。
+development_worlds/service.py         与正式相同的控制台传输、草稿和提交生命周期。
+development_worlds/evaluation.py      候选law.py固定积分、干净真值和公开分项计分。
+development_worlds/runner.py          六公开批量完整运行入口，使用会话账本计算能量。
+
+六公开源码可阅读并用于合法训练数据生成，可以另做研究性副本。标准自测应调用固定评测器；
+更改副本或直接读公式得到的开发成绩不代表未知环境发现能力，不影响正式固定评测实现。
+
+三、依赖与辅助操作
+
+requirements.txt                     CPU实验依赖；GPU依赖由CUDA12.8安装流程单独准备。
+scripts/serve_model.py                七模型统一启动/只读预检，支持无GPU的plan-only。
+scripts/make_submission.py            生成小型提交清单，不复制权重。
+scripts/build_runtime_images.py       依据已安装的本地离线基础镜像构建agent/candidate。
+scripts/bootstrap_cuda128.sh          联网端环境安装；--cpu-build-for h200用于CPU制镜像。
+scripts/prepare_h200_offline_cache.py  CPU端预下载内核及本地校验。
+scripts/verify_h200_cuda128.py         无网H200基础验收，不冒充真实模型推理测试。
+docs/QUICKSTART.txt、MODEL_RUNTIME.txt、MODELS.txt、H200_OFFLINE_SETUP.txt
+                                      运行命令、环境与模型说明。
+
+四、只在指挥部运行
+
+九隐藏宇宙真实模拟器、真实规律与参数、声明真值、隐藏验证轨迹；正式实验服务、
+冻结收卷、隔离执行、评分、队列、榜单和部署配置。以上不在本参赛包内。
+模型通过指挥部受信登记的只读路径接入；组员代码不能自行把宿主私有目录变为可见挂载。
+指挥部保留九隐藏运行材料；赛中成绩响应不包含预言/定律/节约分项或声明正确性。

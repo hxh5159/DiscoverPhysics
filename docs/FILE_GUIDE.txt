@@ -1,99 +1,56 @@
 项目文件用途简表
-更新：2026-11-01
+更新：2026-11-02
 
-本表逐项介绍正式赛题相关文件；原研究工程按目录归类。
-“队伍可改”指复制模板后编写自己的实现；“官方固定”指正式运行使用指挥部发布的版本。
-完整开发仓库不直接发给攻坚组；发放包由白名单打包脚本生成。
+一、给攻坚组的入口
 
-一、先看哪些说明
+docs/QUICKSTART.txt               从环境、模型到六公开完整运行和提交准备的命令。
+docs/PARTICIPANT_FILES.txt        可改、固定、公开开发和指挥部专用文件的具体划分。
+docs/MODEL_RUNTIME.txt、MODELS.txt 七个模型、精度、宿主/容器路径和两类镜像的关系。
+docs/H200_OFFLINE_SETUP.txt       联网CPU构建镜像，再到无网H200运行。
+docs/CUDA128_SETUP.txt            CUDA12.8环境的详细补充。
 
-docs/FILE_GUIDE.txt                     本文件：快速了解文件用途。
-docs/CODE_AND_SUBMISSION_SPEC.txt       完整代码分工、权限、两层提交与计分技术规范。
-docs/CONTEST_WORKFLOW.txt               从智能体启动、探索、交卷到榜单的流程。
-docs/CONSOLE_API.txt                    如何请求任务、实验、观测和上传草稿。
-docs/LAW_API.txt                        law.py接口与固定积分器的用法。
-docs/SUBMISSION_API.txt                 智能体镜像、启动清单、模型路径及受理要求。
+shore_agent/                     可修改的LLM基础agent、提示词、上下文、推理服务和科学工具。
+examples/agent.py                转发到可运行基础agent的便利入口。
+development_worlds/             六公开真实模拟器、目录、实验服务、统一调度与固定评分。
+rift/、rift_numerics/             官方固定通信/候选格式/输入处理和积分器，不含九隐藏真实场。
+scripts/serve_model.py           七模型统一配置和本地服务启动。
+scripts/make_submission.py       生成启动清单，不复制模型权重。
+scripts/build_runtime_images.py 从本地离线基础镜像构建本队agent及固定candidate镜像。
+scripts/validate_*.py            格式预检，不判断物理正误。
 
-docs/彼岸物理规律发现挑战赛_赛题说明_更新版.pdf
-                                        当前面向攻坚组的8页说明。
-docs/彼岸物理规律发现挑战赛_赛题说明_更新版.docx
-                                        上述说明的可编辑版本。
+docs/CONTEST_WORKFLOW.txt        公开开发和隐藏正式运行的共同流程。
+docs/CONSOLE_API.txt             mission/observe/launch/archive/save_draft/submit。
+docs/LAW_API.txt                 真实law.py接口和固定推演；不用JSON数学表达式代替正式提交。
+docs/SUBMISSION_API.txt          代码、模型引用、镜像与清单的冻结提交方式。
+docs/CODE_AND_SUBMISSION_SPEC.txt完整代码分工及技术规范。
+docs/contracts/                  结构化规则、模型身份、600秒、噪声及80/15/5评分。
+examples/                       清单、候选程序和两类Dockerfile模板。
+requirements.txt                CPU实验依赖；模型依赖使用单独CUDA12.8构建流程。
+
+二、发放边界
+
+scripts/package_contest_starter.py只按明确白名单生成攻坚组开发包，包含完整六公开与基础框架。
+不把整个研究仓库、AGENTS.md或指挥部测试仓库直接发给攻坚组。
+正式九宇宙模拟器、定律参数、声明真值、隐藏验证和服务/评分/队列/部署后台只在指挥部包内。
+指挥部runtime/public子目录是同一公开开发包，整个runtime ZIP不是参赛发放包。
+九隐藏运行观测、对话、候选、日志及更新模型留在指挥部，赛中不归还。
+
+三、只供项目维护与历史参考
+
+AGENTS.md                        负责人持续记忆及变更记录，不发给攻坚组。
+docs/RUN_READINESS_CHECK.txt      最新交付检查及仍须在目标设备验证的边界。
+docs/彼岸物理规律发现挑战赛_赛题说明_更新版.pdf及同名docx
+                                 面向攻坚组的8页说明；本轮不改文档排版。
 docs/彼岸物理规律发现挑战赛_赛题说明.docx
-                                        持续维护的详细设计主稿。
-docs/彼岸物理规律发现挑战赛_发布版.docx
-docs/彼岸物理规律发现挑战赛_首次通知.docx
-                                        历史文稿，不能代替当前规则。
+                                 详细主稿。
+docs/彼岸物理规律发现挑战赛_课题介绍.pptx
+                                 课题介绍；本机用户已有修改，本轮不覆盖或代提交。
+PhysicsSchool/、ScienceAgent/、configs/、其余研究脚本、output/
+                                 原研究工程或历史材料，不是当前正式赛题执行入口。
+docs/旧发布版、首次通知、研究笔记    历史资料，不能替代当前规则和快速开始。
 
-二、队伍可以复制改写的模板
+四、测试与部署的区别
 
-examples/agent.py                       智能体入口占位；队伍自行实现探索和模型调用。
-examples/submission.json                填写队伍身份、版本、启动入口和模型声明。
-examples/law.py                         候选加速度函数示例；实际由智能体逐宇宙生成。
-examples/law_case.json                  非正式宇宙的接口输入假例，用于本地自检。
-examples/Dockerfile.agent               镜像构建示例，可按规则调整。
-
-示例不包含正式宇宙答案；agent.py不是有效发现基线。
-law.py与claims.json是每宇宙自动产生的交卷配对；report.md可选。
-自己的提示词、工具、拟合模块和可选训练脚本可另建目录，不强制文件名。
-
-三、公开但由官方固定的程序
-
-rift/__init__.py                       导出Console、load_law、rollout等统一接口。
-rift/console.py                        与私有实验服务通信，不包含真实力场。
-rift/submission.py                     校验外层清单、模型声明、路径和制品摘要。
-rift/law.py                            校验并加载候选law.py及其对象元数据。
-rift/observations.py                   将合法观测记录整理为候选推演输入。
-rift/prediction.py                     校验case并驱动固定候选积分。
-rift/worker.py                         独立执行冻结的候选程序，返回预测结果。
-rift_numerics/__init__.py               导出通用数值接口。
-rift_numerics/rollout.py                固定数值积分实现，只推演传入的候选规律。
-
-scripts/validate_claims.py              检查三项声明的字段和类型，不判断正误。
-scripts/validate_law.py                 检查law.py；可在假例上执行候选推演。
-scripts/validate_submission.py          检查外层提交清单及可选的包内文件存在性。
-scripts/package_contest_starter.py      按明确文件白名单生成攻坚组起步ZIP。
-
-四、机器可读规则：docs/contracts/
-
-claims.schema.json                     claims.json三字段结构、值类型。
-claims.example.json                    合法格式示例，字段值不是正式宇宙答案。
-law_api.json                           候选程序入口、元数据及执行约定。
-law_case.schema.json                   候选积分输入case的格式。
-submission.schema.json                 外层submission.json的格式。
-exploration_protocol.json              操作、配额、第一束光、时间及探索边界。
-numerics.json                          固定积分器、步长、采样和数值约定。
-observation_noise.json                 观测加噪规则；评分真值不加观测噪声。
-scoring.json                           现行80/(1+10e)、80/15/5及同分规则。
-feedback.schema.json                   公开成绩反馈结构，不含分项正误。
-runtime.json                           启动、会话、九宇宙运行及截止规则。
-implementation_review.json             实施审查与尚待验收的事项。
-
-五、回归检查：tests/
-
-test_claims_contract.py                声明格式及类型检查。
-test_law_contract.py                   候选程序、参数和对象元数据检查。
-test_law_rollout.py                    候选输入、时间网格及轨迹推演检查。
-test_law_worker.py                     独立候选进程和输入输出协议检查。
-test_shared_numerics.py                共享数值实现的一致性检查。
-test_console_client.py                 控制台通信、错误处理和档案导出检查。
-test_submission_contract.py            启动清单、制品身份和公开包边界检查。
-
-六、项目管理与历史研究目录
-
-AGENTS.md                              项目持续记忆、已确认要求与实施状态；不随起步包发放。
-README.md                              原研究仓库介绍；当前比赛规则以现行说明/契约为准。
-LICENSE                                原仓库许可证。
-.gitignore                             排除环境密钥、缓存、临时输出等文件。
-.github/                               原仓库的GitHub配置。
-PhysicsSchool/                         原研究环境与实验代码，不是正式九宇宙交付。
-ScienceAgent/                          原研究智能体代码，不是队伍可直接使用的参赛框架。
-configs/                               原研究运行配置，不是正式比赛配置。
-scripts/其余研究脚本                   原基准运行、统计、聚合及研究笔记构建等工具。
-imgs/、output/                         原研究图像与结果资料，不能当正式参赛数据。
-
-七、仓库与指挥部私有系统的关系
-
-真实九宇宙模拟器、真实参数、声明真值、隐藏验证数据，以及控制台服务端、计分、队列、
-榜单和部署配置在指挥部私有运行包内，不提交这个公开仓库。
-因此，git clone/git pull同步的是公开部分；指挥部部署完整后台还需另行同步私有运行包。
-公开固定积分器不含真实规律。正式环境和资源配置仍须按验收清单确认。
+tests/                           固定SDK、协议、模型配置、基础agent和六公开服务的回归检查。
+新包经过隔离解压及本机合成推理服务联调；这不代表所有真实权重都在目标H200上验收。
+目标设备通过指挥部configure_runtime的配置、预检、真实生成和发布步骤后进入正式队列。

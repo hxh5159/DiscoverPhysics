@@ -1,0 +1,74 @@
+本地模型选择、加载与容器路径
+版本：1.0.0；环境：现行CUDA12.8 / vLLM0.24.0配置。
+
+一、七个起步配置
+
+模型目录默认：/inspire/hdd/project/26-the-other-shore/public/models
+固定映射见rift/model_catalog.json，可用python scripts/serve_model.py --list查看。
+
+选择键        实际模型变体                    存储精度
+27b           Qwen3.8-27B                    BF16
+35b           Qwen3.6-35B-A3B                BF16
+35b-fp8       Qwen3.6-35B-A3B-FP8            FP8
+122b          Qwen3.5-122B-A10B              BF16
+122b-fp8      Qwen3.5-122B-A10B-FP8          FP8
+397b          Qwen3.5-397B-A17B              BF16
+397b-fp8      Qwen3.5-397B-A17B-FP8          FP8
+
+35b-fp8优先识别用户提供的Qwen-3.6-35B-A3B-FP8目录，也接受没有额外横杠的别名。
+映射不会重命名文件或改变精度。提供的七变体不排除其他已允许模型；其他模型可接入
+显式部署的本机兼容服务，不能借此使用白名单外权重或外部模型API。
+
+二、先看配置，再启动模型
+
+以下命令在远端Linux的参赛包/项目根目录执行：
+
+python scripts/serve_model.py --model 27b --plan-only
+
+此项只打印配置，不要求模型文件、GPU或vLLM已安装。
+
+python scripts/serve_model.py --model 27b --dry-run
+
+此项检查本地config、tokenizer和safetensors头部，不加载权重或查询GPU。
+有自训的完整推理检查点时可加--model-path /实际检查点目录，并按其真实精度选择配置。
+
+python scripts/serve_model.py --model 27b \
+  --model-python /opt/shore-h200-cu128/.venv-vllm-cu128/bin/python \
+  --tp-size 4 --port 8000
+
+实际启动前会用模型环境检查vLLM0.24、Torch CUDA12.8、可见GPU和基础显存容量。
+不安装库、不下载模型、不更改CUDA_VISIBLE_DEVICES，不请求在线量化。
+397B的BF16权重不能在默认4H200显存中全量驻留，会在模型加载前明确拒绝；可选择
+已有397b-fp8。能通过容量检查不等于KV缓存、MoE内核和实际生成已经验收。
+
+三、同一基础agent的两种加载方式
+
+使用既有本机服务：
+  --model 27b --base-url http://127.0.0.1:8000/v1
+
+自动启动本机服务：
+  --model 27b --model-root /实际模型根目录 --model-python /实际模型环境/bin/python
+
+对应命令行由六公开开发驱动或正式提交entrypoint传递。自动加载在首次mission之前完成，
+不占每宇宙600秒探索窗口；模型服务就绪后才进入宇宙。基础框架支持更改提示词、工具、
+记忆和程序，提交时须保留这些策略代码，不能只提交未包含策略的模型权重。
+
+已有服务地址只接受显式本机HTTP回环，禁止代理和重定向，不提供闭源API回退。
+服务自报的model名称用于发现配置，不是权重来源证明；来源核查仍由指挥部执行。
+模型回复只有思考、没有最终动作时，不把思考内容当作实验指令执行。
+
+四、容器内路径与离线镜像
+
+正式环境由指挥部把已登记的模型根目录只读挂载为/models，保持相对模型目录名。
+模型配置在发现/models存在时优先使用它；容器清单中的模型路径必须写/models/...，
+不能把宿主/inspire路径直接填入提交清单。SHORE_MODEL_ROOT或--model-root可显式覆盖。
+
+实验环境与模型环境可以分开。自动启动优先SHORE_MODEL_PYTHON、再使用已存在的
+/opt/shore-h200-cu128/.venv-vllm-cu128/bin/python。工具链和只读预下载内核随CPU镜像保留，
+启动器可读取镜像的cuda128-build-manifest.json恢复CUDA_HOME、CC/CXX与PTX路径。
+HF、vLLM、Triton、FlashInfer和Torch可写JIT缓存放在本局产物目录的model-service/.cache，
+不会尝试往只读/opt目录写缓存；H200端保持离线，缺依赖/模型文件时返回明确错误。
+
+当前启动器与旧指挥部0.32/cu129 serve_open_models.py分开；不要混用其版本检查或
+在线量化参数。接口参考：https://docs.vllm.ai/en/v0.24.0/cli/serve/
+以及 https://docs.vllm.ai/en/v0.24.0/serving/online_serving/openai_compatible_server/

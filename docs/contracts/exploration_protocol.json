@@ -314,7 +314,7 @@
     "online_vs_final_test_set_relationship": "本轮尚未指定，保持待后续明确",
     "private_trial_status": "本地工程链路已实现；模型/API试做仍暂停，正式Linux权限/镜像/GPU/容量待验收",
     "own_legal_artifacts_reusable_across_submissions": true,
-    "own_artifact_export": "归还本队任务、合法观测、候选规律与自产模型成果；不含真值、分项和内部日志"
+    "own_artifact_export": "六公开开发材料可自行保留；九隐藏运行观测、对话、日志、候选、记忆与更新权重赛中不归还，仅指挥部留存"
   },
   "communication_policy": {
     "internet_allowed": false,

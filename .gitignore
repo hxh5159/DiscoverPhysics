@@ -34,6 +34,7 @@ Thumbs.db
 
 # Data / results
 results/
+agent-output/
 
 # Claude Code
 CLAUDE.md

@@ -1,0 +1,90 @@
+彼岸挑战：参赛程序快速开始
+
+一、准备
+
+解压攻坚组开发包，进入同时含shore_agent、development_worlds和rift的包根目录。
+不需要克隆研究仓库，不需要指挥部私有包。已有官方镜像及本地模型时可直接进入第二步。
+联网CPU制作CUDA12.8镜像、随后在无网H200运行的完整环境步骤见H200_OFFLINE_SETUP.txt。
+requirements.txt只列实验与拟合依赖；模型环境使用官方bootstrap流程，不宽松安装其他vLLM版本。
+
+以下命令都在远端Linux执行。已配置好的标准环境：
+
+  PY='/opt/shore-h200-cu128/.venv-trial/bin/python'
+  MPY='/opt/shore-h200-cu128/.venv-vllm-cu128/bin/python'
+  MODELROOT='/inspire/hdd/project/26-the-other-shore/public/models'
+  MODEL='27b'
+
+路径不同时只调整对应变量。模型目录必须已实际挂载，不能仅在另一个实例的overlay中存在。
+若尚需安装CPU实验依赖，使用本地已选Python及所在环境认可的索引：
+
+  env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
+    "$PY" -m pip install -r requirements.txt \
+    --index-url "$PIP_MIRROR" --trusted-host "$PIP_MIRROR_HOST" --no-cache-dir
+
+PIP_MIRROR与PIP_MIRROR_HOST由使用者填入平台镜像地址；无网H200不执行安装。
+
+二、直接运行六公开宇宙
+
+  "$PY" scripts/serve_model.py --list
+
+七个预设为27b、35b、35b-fp8、122b、122b-fp8、397b、397b-fp8。
+先用27b检查流程，再按算力及实际精度选择其它预设。纯BF16的397b不适合4H200全GPU加载；
+同家族可选已提供397b-fp8，不会在程序里偷偷更改权重精度。
+
+  "$PY" -m development_worlds.runner \
+    --worlds 1 2 3 4 5 6 --model "$MODEL" --model-root "$MODELROOT" \
+    --model-python "$MPY" --output "results/dev-$(date +%Y%m%d-%H%M%S)"
+
+程序按世界启动同一个基础agent，加载模型后领取任务，自主实验、拟合和保存候选，
+最后提交law.py/claims.json，再由固定积分器和公开评测器计分。
+未加载模型、推理服务失败或没有合法交卷时会明确记录，不用预置答案或零加速度伪装完成。
+每个世界从首次成功mission起600秒；加载另计，评分发生在探索结束之后。
+
+输出根目录中的summary.json给出各公开世界结果；各world目录保存合法观测、候选、日志及分项。
+旧输出目录不覆盖。公开开发可无限重开会话；每次标准会话仍按100能量、20次observe计量。
+可先把--worlds改为2，检查一界后再跑全六界。目录中的真公式公开，但基础agent不会读取它们。
+
+三、复用已启动的本地推理服务
+
+自动模式每个新agent都独立启动模型。开发时可在同一GPU节点的终端A先启动一次：
+
+  "$PY" scripts/serve_model.py --model "$MODEL" --model-root "$MODELROOT" --model-python "$MPY"
+
+同节点终端B运行：
+
+  "$PY" -m development_worlds.runner --worlds 1 2 3 4 5 6 --model "$MODEL" \
+    --base-url http://127.0.0.1:8000/v1 \
+    --output "results/shared-service-$(date +%Y%m%d-%H%M%S)"
+
+基础客户端只连接显式本机服务，不自动调用外部模型。两种启动方式使用相同实验和计分链。
+
+四、修改自己的方案
+
+shore_agent/是可修改基础框架。可以改提示词、历史与记忆、实验策略和工具，或使用合法的
+自训权重；不强制使用这个基线。模型只获取mission及本局允许观测，不向模型提供评测真值。
+check/fit工具只使用已取得的观测，通过固定积分器检验模型自己提出的候选程序。
+完整可改/固定文件划分见PARTICIPANT_FILES.txt，law接口见LAW_API.txt。
+
+五、准备交给指挥部的同一方案
+
+  "$PY" scripts/make_submission.py --model "$MODEL" --team-id team01 \
+    --submission-id team01-v1 --output submission.json
+  "$PY" scripts/validate_submission.py submission.json
+
+生成的是小型启动清单，包含同一基础agent入口和模型容器路径；不会复制大模型。
+自训或自行合并后的检查点需按指挥部登记的冻结路径填入--model-path及正确adaptation，
+对应源码、提示词、工具、合法公开记忆也随本次方案冻结。只交权重不能表达提示词等策略变化。
+
+使用已在本机导入的官方离线基础镜像制作本队镜像：
+
+  "$PY" scripts/build_runtime_images.py --base-image "$LOCAL_BASE_IMAGE" \
+    --manifest submission.json --agent-tag shore-agent:team01-v1 \
+    --output image-ids-team01-v1.json
+
+LOCAL_BASE_IMAGE是实际本地镜像名或ID。命令不联网拉镜像或安装依赖，生成的agent镜像
+保存本队程序，candidate镜像用于固定候选推演；镜像ID写入小型回执。平台镜像保存与
+Docker导入是两种操作，只有docker image inspect能找到的本地基础镜像可直接使用本命令。
+
+指挥部在自己的隔离端运行同一entrypoint，注入九隐藏环境控制台并只读挂载已登记模型。
+攻坚组无需拿到九个真实模拟器；正式端不把观测、对话、候选、日志或更新权重归还给队员。
+正式结果只返回规定总分、各宇宙总分及必要启动/格式错误。六公开成绩不进入正式榜单。

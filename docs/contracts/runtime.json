@@ -1,5 +1,5 @@
 {
-  "runtime_version": "1.2.0",
+  "runtime_version": "1.3.0",
   "updated": "2026-11-02",
   "status": "implemented_local_engineering_checks_target_linux_deployment_pending",
   "outer_submission": {
@@ -53,11 +53,12 @@
     "atomic_pair": true,
     "prediction": "队伍本地与指挥部正式驱动都调用同一固定积分器；law.py只提供候选加速度",
     "format_errors": "公开code/path/message，仅报告格式与运行接口问题，不判科学正误",
-    "own_export": "可归还本组任务包、允许观测、候选规律、声明与自产模型成果；绝不含官方隐藏真值、分项和诊断日志"
+    "own_export": "赛中不归还任何九隐藏运行观测、对话、日志、新记忆、候选或更新权重；指挥部留存，赛后另行决定",
+    "hidden_run_materials_returned_during_contest": false
   },
   "learning_and_persistence": {
     "confirmed": true,
-    "cross_submission": "允许复用本队合法取得的观测、候选规律及基于白名单形成的模型成果",
+    "cross_submission": "允许复用六公开开发环境中本队合法取得的数据、候选规律、记忆与白名单模型成果；九隐藏运行新产生的材料赛中不返还",
     "new_run": "每次正式运行新建独立会话、配额和完整成绩；评分器不拼接历史结果",
     "knowledge_vs_scoring": "独立评分不等于禁止合法知识复用；运行器不自动注入历史秘密或其他队伍数据",
     "manual_intervention_during_evaluation": false

@@ -1,0 +1,10 @@
+# Use the local image built on the connected CPU instance, with the prepared
+# experiment environment retained at SHORE_ENV_ROOT. No network installation.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG SHORE_ENV_ROOT=/opt/shore-h200-cu128
+ENV SHORE_ENV_ROOT=${SHORE_ENV_ROOT}
+ENV PATH=${SHORE_ENV_ROOT}/.venv-trial/bin:${PATH}
+ENV HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 PYTHONDONTWRITEBYTECODE=1
+WORKDIR /work
+# The trusted runner mounts the fixed SDK and one candidate law at execution.

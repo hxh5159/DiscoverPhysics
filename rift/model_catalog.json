@@ -1,0 +1,17 @@
+{
+  "catalog_version": "1.0.0",
+  "model_root": "/inspire/hdd/project/26-the-other-shore/public/models",
+  "container_root": "/models",
+  "vllm_version": "0.24.0",
+  "cuda_version": "12.8",
+  "default_model": "27b",
+  "models": [
+    {"id": "27b", "family": "Qwen3.8-27B", "base_model": "Qwen3.8-27B", "served_model_name": "Qwen3.8-27B", "directory": "Qwen3.8-27B", "directory_aliases": [], "precision": "BF16", "parameter_billions": 27},
+    {"id": "35b", "family": "Qwen3.6-35B-A3B", "base_model": "Qwen3.6-35B-A3B", "served_model_name": "Qwen3.6-35B-A3B", "directory": "Qwen3.6-35B-A3B", "directory_aliases": [], "precision": "BF16", "parameter_billions": 35},
+    {"id": "35b-fp8", "family": "Qwen3.6-35B-A3B", "base_model": "Qwen3.6-35B-A3B-FP8", "served_model_name": "Qwen3.6-35B-A3B-FP8", "directory": "Qwen-3.6-35B-A3B-FP8", "directory_aliases": ["Qwen3.6-35B-A3B-FP8"], "precision": "FP8", "parameter_billions": 35},
+    {"id": "122b", "family": "Qwen3.5-122B-A10B", "base_model": "Qwen3.5-122B-A10B", "served_model_name": "Qwen3.5-122B-A10B", "directory": "Qwen3.5-122B-A10B", "directory_aliases": [], "precision": "BF16", "parameter_billions": 122},
+    {"id": "122b-fp8", "family": "Qwen3.5-122B-A10B", "base_model": "Qwen3.5-122B-A10B-FP8", "served_model_name": "Qwen3.5-122B-A10B-FP8", "directory": "Qwen3.5-122B-A10B-FP8", "directory_aliases": [], "precision": "FP8", "parameter_billions": 122},
+    {"id": "397b", "family": "Qwen3.5-397B-A17B", "base_model": "Qwen3.5-397B-A17B", "served_model_name": "Qwen3.5-397B-A17B", "directory": "Qwen3.5-397B-A17B", "directory_aliases": [], "precision": "BF16", "parameter_billions": 397},
+    {"id": "397b-fp8", "family": "Qwen3.5-397B-A17B", "base_model": "Qwen3.5-397B-A17B-FP8", "served_model_name": "Qwen3.5-397B-A17B-FP8", "directory": "Qwen3.5-397B-A17B-FP8", "directory_aliases": [], "precision": "FP8", "parameter_billions": 397}
+  ]
+}

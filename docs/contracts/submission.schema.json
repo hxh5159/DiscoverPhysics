@@ -23,7 +23,7 @@
         "properties": {
           "base_model": {
             "type": "string",
-            "enum": ["Qwen3.8-27B", "GLM-4.7-Flash", "Qwen3.6-35B-A3B", "Kimi-Linear-48B-A3B-Instruct", "GLM-4.5-Air-FP8", "Qwen3.5-122B-A10B-FP8", "DeepSeek-V4-Flash", "MiniMax-M2.5", "Qwen3.5-397B-A17B-FP8"]
+            "enum": ["Qwen3.8-27B", "GLM-4.7-Flash", "Qwen3.6-35B-A3B", "Kimi-Linear-48B-A3B-Instruct", "GLM-4.5-Air-FP8", "Qwen3.5-122B-A10B-FP8", "DeepSeek-V4-Flash", "MiniMax-M2.5", "Qwen3.5-397B-A17B-FP8", "Qwen3.6-35B-A3B-FP8", "Qwen-3.6-35B-A3B-FP8", "Qwen3.5-122B-A10B", "Qwen3.5-397B-A17B", "27b", "35b", "35b-fp8", "122b", "122b-fp8", "397b", "397b-fp8"]
           },
           "path": {
             "type": "string", "minLength": 1, "maxLength": 1024,

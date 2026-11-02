@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT))
 from rift.submission import (SubmissionError, WHITELIST_MODELS, artifact_digest,
                              check_submission_files, load_manifest, manifest_digest,
                              parse_manifest, validate_manifest)
+from rift.model_registry import canonical_base_model
 
 spec = importlib.util.spec_from_file_location("public_starter_packager", ROOT / "scripts/package_contest_starter.py")
 packager = importlib.util.module_from_spec(spec)
@@ -36,6 +37,9 @@ def public_fixture(root):
             path.write_text(json.dumps({"numerics_version": "1.1", "integrator": "yoshida4",
                                        "dt": .005, "sampling": {"rule": "strict_ticks"},
                                        "dp_reference_review": "SECRET_MARKER_MUST_NOT_BE_PACKAGED"}), encoding="utf8")
+        elif name == "docs/contracts/exploration_protocol.json":
+            path.write_text(json.dumps({"protocol_version":"3.9.0", "framework_reuse_policy":"SECRET_MARKER_MUST_NOT_BE_PACKAGED",
+                "launch_request":{"semantics":"private design comparison"}}),encoding="utf8")
         elif name.endswith(".schema.json"):
             path.write_text(json.dumps({"$id": "urn:discoverphysics:example:1.0.0", "type": "object"}), encoding="utf8")
         else:
@@ -51,7 +55,7 @@ class SubmissionTests(unittest.TestCase):
 
     def test_supplied_example_validates_without_running_model(self):
         result = load_manifest(ROOT / "examples/submission.json")
-        self.assertEqual(result["entrypoint"], ["python", "agent.py"])
+        self.assertEqual(result["entrypoint"][:3], ["python", "-m", "shore_agent.agent"])
         self.assertIn(result["models"][0]["base_model"], WHITELIST_MODELS)
 
     def test_all_published_whitelist_identifiers_accepted(self):
@@ -166,7 +170,12 @@ class SubmissionTests(unittest.TestCase):
     def test_schema_model_identifiers_match_checker(self):
         schema = json.loads((ROOT / "docs/contracts/submission.schema.json").read_text(encoding="utf8"))
         choices = schema["properties"]["models"]["items"]["properties"]["base_model"]["enum"]
-        self.assertEqual(choices, list(WHITELIST_MODELS))
+        # Preset/directory aliases normalize to a registered precision variant.
+        self.assertEqual(set(map(canonical_base_model, choices)), set(WHITELIST_MODELS))
+        for choice in choices:
+            value = manifest()
+            value['models'][0]['base_model'] = choice
+            self.assertEqual(validate_manifest(value)['models'][0]['base_model'], canonical_base_model(choice))
 
     def test_cli_static_check_has_no_execution_or_scientific_claim(self):
         process = subprocess.run([sys.executable, str(ROOT/"scripts/validate_submission.py"),

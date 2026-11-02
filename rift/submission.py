@@ -11,14 +11,10 @@ import json
 from pathlib import Path, PurePosixPath
 import re
 
+from .model_registry import WHITELIST_MODELS, canonical_base_model
+
 
 SUBMISSION_SCHEMA_VERSION = "1.0.0"
-WHITELIST_MODELS = (
-    "Qwen3.8-27B", "GLM-4.7-Flash", "Qwen3.6-35B-A3B",
-    "Kimi-Linear-48B-A3B-Instruct", "GLM-4.5-Air-FP8",
-    "Qwen3.5-122B-A10B-FP8", "DeepSeek-V4-Flash", "MiniMax-M2.5",
-    "Qwen3.5-397B-A17B-FP8",
-)
 _ROOT_FIELDS = frozenset(("schema_version", "submission_id", "team_id", "version", "entrypoint", "models"))
 _MODEL_FIELDS = frozenset(("base_model", "path", "revision", "sha256", "adaptation"))
 _ADAPTATIONS = frozenset(("base", "quantized", "sft", "rl", "other"))
@@ -94,9 +90,11 @@ def validate_manifest(value):
     for i, item in enumerate(models):
         path = f"$.models[{i}]"
         _keys(item, _MODEL_FIELDS, ("base_model", "path"), path)
-        if not isinstance(item["base_model"], str) or item["base_model"] not in WHITELIST_MODELS:
+        try:
+            base_model = canonical_base_model(item["base_model"])
+        except ValueError:
             raise SubmissionError(path + ".base_model", "Expected a model identifier from the published whitelist.")
-        model = {"base_model": item["base_model"], "path": _model_path(item["path"], path + ".path")}
+        model = {"base_model": base_model, "path": _model_path(item["path"], path + ".path")}
         if "revision" in item:
             model["revision"] = _text(item["revision"], path + ".revision", 256)
         if "sha256" in item:
