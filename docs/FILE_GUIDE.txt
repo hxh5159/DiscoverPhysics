@@ -8,6 +8,7 @@ docs/PARTICIPANT_FILES.txt        可改、固定、公开开发和指挥部专�
 docs/MODEL_RUNTIME.txt、MODELS.txt 七个模型、精度、宿主/容器路径和两类镜像的关系。
 docs/H200_OFFLINE_SETUP.txt       联网CPU构建镜像，再到无网H200运行。
 docs/REMOTE_CPU_H200_COMMANDS.txt  精确克隆路径、工具链安装、CPU制镜像、H200实生成/六公开及九隐藏可选命令。
+scripts/prepare_cpu_h200.sh       联网CPU完整准备短入口；明确路径/挂载与错误，安装构建后准备离线资源，不运行模型。
 docs/CUDA128_SETUP.txt            CUDA12.8环境的详细补充。
 
 shore_agent/                     可修改的LLM基础agent、提示词、上下文、推理服务和科学工具。

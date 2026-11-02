@@ -1,5 +1,5 @@
 从联网CPU准备到无网H200运行的完整命令
-日期：2026-11-02
+日期：2026-11-03
 
 固定目录：
   主项目 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics
@@ -19,109 +19,20 @@ CPU不要求GPU、nvidia-smi或模型目录，先装Conda工具链以保证git/n
 Conda用NVIDIA cuda-12.8.1标签固定12.8补丁版本；不是安装GPU驱动。
 Conda优先使用当前CONDA_EXE或PATH；找不到时检查原安装位置，不将旧项目目录继续作为源码路径。
 
-运行方式：bash <<'CPU'，粘贴下列脚本正文，最后单独一行CPU。
+推荐使用下列短入口，不再粘贴长heredoc。完整实现位于scripts/prepare_cpu_h200.sh。
+它会明确打印阶段、实际路径和失败原因；BASE缺失时先核实共享挂载再创建，
+不会因裸test -d静默退出，也不会在overlay中创建伪共享目录。
 
-#!/usr/bin/env bash
-set -euo pipefail
-umask 077
+# 先按会话提供的值设置SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST。
+# 下载成功后才执行，避免网络失败时误运行旧的临时文件。
+curl -fL --retry 3 \
+  'https://raw.githubusercontent.com/hxh5159/DiscoverPhysics/main/scripts/prepare_cpu_h200.sh' \
+  -o /tmp/shore-prepare-cpu-h200.sh &&
+bash /tmp/shore-prepare-cpu-h200.sh \
+  --index-url "${SHORE_PIP_MIRROR:?请先设置SHORE_PIP_MIRROR}" \
+  --trusted-host "${SHORE_PIP_MIRROR_HOST:?请先设置SHORE_PIP_MIRROR_HOST}"
 
-SHARED='/inspire/hdd/project/26-the-other-shore/fengkairui-25026'
-BASE="$SHARED"
-PROJECT="$BASE/DiscoverPhysics"
-ASSETS="$BASE/test"
-TESTROOT="$BASE/shore-organizer-open-model-test-20261101"
-ENVROOT='/opt/shore-h200-cu128'
-TOOLROOT='/opt/shore-h200-toolchain'
-SCRIPTS='/opt/shore-image-tools'
-PIP_MIRROR="${SHORE_PIP_MIRROR:?先设置SHORE_PIP_MIRROR}"
-PIP_MIRROR_HOST="${SHORE_PIP_MIRROR_HOST:?先设置SHORE_PIP_MIRROR_HOST}"
-
-# 项目必须位于真实共享挂载，避免mkdir产生overlay中的同名路径。
-test -d "$SHARED"
-findmnt -T "$SHARED" -o TARGET,SOURCE,FSTYPE
-case "$(findmnt -n -T "$SHARED" -o FSTYPE)" in
-  overlay|tmpfs|ramfs) echo '共享项目盘未挂载，先恢复平台挂载。' >&2; exit 2 ;;
-esac
-mkdir -p "$BASE" "$SCRIPTS"
-
-# 使用已有Conda绝对路径，重启后不依赖shell里的conda函数。
-CONDA_BIN="${CONDA_EXE:-}"
-if [ ! -x "$CONDA_BIN" ]; then
-  CONDA_BIN="$(type -P conda || true)"
-fi
-if [ ! -x "$CONDA_BIN" ]; then
-  # 项目迁移不代表原Conda安装被移动；仅在原可执行文件仍存在时复用。
-  CONDA_BIN='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/miniconda3/bin/conda'
-fi
-test -x "$CONDA_BIN" || { echo '找不到已有Conda可执行文件。' >&2; exit 2; }
-
-if [ -f "$TOOLROOT/conda-meta/history" ]; then
-  CONDA_ACTION=install
-else
-  CONDA_ACTION=create
-fi
-# 只对求解器声明目标CUDA，不安装/升级宿主GPU驱动。
-CONDA_OVERRIDE_CUDA=12.8 "$CONDA_BIN" "$CONDA_ACTION" -y --prefix "$TOOLROOT" \
-  --override-channels --channel nvidia/label/cuda-12.8.1 --channel conda-forge \
-  'cuda-toolkit=12.8.1' 'gcc_linux-64=12' 'gxx_linux-64=12' \
-  'python=3.12' pip git curl make pkg-config
-
-export SHORE_CUDA128_HOME="$TOOLROOT"
-export CC="$TOOLROOT/bin/x86_64-conda-linux-gnu-gcc"
-export CXX="$TOOLROOT/bin/x86_64-conda-linux-gnu-g++"
-export PATH="$TOOLROOT/bin:$HOME/.local/bin:$PATH"
-export UV_PYTHON_INSTALL_DIR="$ENVROOT/.tools/python"
-export UV_CACHE_DIR="$ENVROOT/.cache/uv"
-export UV_PYTHON_PREFERENCE=only-managed
-export SHORE_BUILD_JOBS=2
-export GIT_TERMINAL_PROMPT=0
-"$TOOLROOT/bin/nvcc" --version
-"$TOOLROOT/bin/ptxas" --version
-"$CC" --version
-"$CXX" --version
-if command -v uv >/dev/null; then uv --version; fi
-
-sync_public_repo() {
-  local url="$1" target="$2"
-  if [ -d "$target/.git" ]; then
-    git -c credential.helper= -C "$target" pull --ff-only
-  elif [ ! -e "$target" ]; then
-    git -c credential.helper= clone "$url" "$target"
-  else
-    echo "目标已有非Git内容，停止而不覆盖：$target" >&2
-    return 2
-  fi
-}
-cd "$BASE"
-sync_public_repo https://github.com/hxh5159/DiscoverPhysics.git "$PROJECT"
-sync_public_repo https://github.com/hxh5159/test.git "$ASSETS"
-
-# 在CPU提前取齐指挥部测试资料，H200阶段无需git或下载。
-if [ -f "$TESTROOT/.test-bundle-receipt.json" ]; then
-  python3 "$ASSETS/prepare_test_bundle.py" --bundle h200 --target "$TESTROOT" --refresh
-else
-  python3 "$ASSETS/prepare_test_bundle.py" --bundle h200 --target "$TESTROOT"
-fi
-
-cp "$PROJECT/scripts/bootstrap_cuda128.sh" "$SCRIPTS/"
-cp "$PROJECT/scripts/prepare_h200_offline_cache.py" "$SCRIPTS/"
-cp "$PROJECT/scripts/verify_h200_cuda128.py" "$SCRIPTS/"
-git -C "$PROJECT" rev-parse HEAD > "$SCRIPTS/project-commit.txt"
-
-# 自动检查/复用uv，创建两个Python3.12环境，CPU不要求GPU。
-cd "$PROJECT"
-bash "$SCRIPTS/bootstrap_cuda128.sh" \
-  --cpu-build-for h200 --env-root "$ENVROOT" \
-  --index-url "$PIP_MIRROR" --trusted-host "$PIP_MIRROR_HOST"
-
-PY="$ENVROOT/.venv-trial/bin/python"
-"$PY" "$SCRIPTS/prepare_h200_offline_cache.py" --env-root "$ENVROOT" \
-  --index-url "$PIP_MIRROR" --trusted-host "$PIP_MIRROR_HOST"
-"$PY" "$SCRIPTS/prepare_h200_offline_cache.py" --env-root "$ENVROOT" --verify
-test -f "$ENVROOT/activate_h200_offline.sh"
-"$PY" -c 'import sys,numpy,scipy; print(sys.executable); print(numpy.__version__,scipy.__version__)'
-printf '\nCPU准备完成。现在在平台保存当前实例镜像，保留/opt三个目录。\n'
-printf '%s\n' "$ENVROOT" "$TOOLROOT" "$SCRIPTS"
+# 只查看配置而不安装时，在上面bash命令末尾添加 --plan。
 
 二、在平台保存镜像
 
@@ -140,7 +51,7 @@ printf '%s\n' "$ENVROOT" "$TOOLROOT" "$SCRIPTS"
 Qwen短烟测可能只生成思考token；以实际生成token验证链路，不将空最终文本误判为模型未加载。
 随后同一已加载服务完成六公开标准流程；实际分数/交卷质量由所用模型及策略决定。
 
-运行方式同上，将结束标记换为H200。
+本节运行方式：bash <<'H200'，粘贴下列脚本正文，最后单独一行H200。
 
 #!/usr/bin/env bash
 set -euo pipefail
