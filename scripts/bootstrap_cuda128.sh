@@ -154,6 +154,10 @@ if ! command -v uv >/dev/null; then
 fi
 command -v uv >/dev/null || die 'uv installation completed but uv is not on PATH; add your Python user-base bin directory and retry.'
 mkdir -p -- "$ENV_ROOT"
+# Keep managed interpreters on the same persistent storage as the environments.
+export UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-$ENV_ROOT/.tools/python}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$ENV_ROOT/.cache/uv}"
+export UV_LINK_MODE=copy
 for location in "$TRIAL_ENV" "$MODEL_ENV"; do
     if [ ! -e "$location" ]; then uv venv --python 3.12 "$location"; fi
     "$location/bin/python" -c 'import sys; assert sys.prefix != sys.base_prefix, "Expected a virtual environment"; assert sys.version_info[:2] == (3, 12), "Python 3.12 is required"'
