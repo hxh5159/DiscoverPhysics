@@ -1,17 +1,17 @@
 {
-  "review_version": "1.11.0",
+  "review_version": "1.12.0",
   "review_date": "2026-11-02",
-  "scope": "正式比赛运行系统构建与本地工程验收；观测噪声更新为1.1.0，增加轻量探针速度噪声；真实力场、积分态、10e计分和配额保持，远端Linux/GPU/权限/容量及正式profile未验收",
+  "scope": "正式比赛运行系统构建与本地工程验收；每宇宙自动探索与推理限时600秒、模型加载和结束后固定积分/评分另计；观测噪声1.1.0，增加轻量探针速度噪声；真实力场、积分态、10e计分和配额保持，远端Linux/GPU/权限/容量及正式profile未验收",
   "basis": {
     "statement": "docs/彼岸物理规律发现挑战赛_赛题说明.docx",
-    "exploration": "3.8.0",
+    "exploration": "3.9.0",
     "claims": "4.0.0",
     "scoring": "draft-3.11.0",
     "numerics": "1.1",
     "feedback": "1.0.0",
     "observation_noise": "1.1.0",
     "law_api": "1.0.0",
-    "runtime": "1.1.0",
+    "runtime": "1.2.0",
     "submission": "1.0.0"
   },
   "implementation_ready": false,
@@ -85,7 +85,7 @@
       "kind": "resource_decision",
       "topic": "实时排名与完整探索耗时",
       "evidence": [
-        "草稿每宇宙60分钟",
+        "草稿每宇宙10分钟",
         "草稿九宇宙依次运行",
         "每组4H200与48小时"
       ],

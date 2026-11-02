@@ -1,6 +1,6 @@
 {
-  "runtime_version": "1.1.0",
-  "updated": "2026-10-31",
+  "runtime_version": "1.2.0",
+  "updated": "2026-11-02",
   "status": "implemented_local_engineering_checks_target_linux_deployment_pending",
   "outer_submission": {
     "manifest_schema": "submission.schema.json",
@@ -23,11 +23,11 @@
   },
   "session": {
     "console_protocol_version": "1.0.0",
-    "exploration_protocol_version": "3.8.0",
+    "exploration_protocol_version": "3.9.0",
     "authenticated": true,
     "client_selects_world_or_session": false,
-    "wall_clock_seconds": 3600,
-    "clock_start": "本宇宙首次成功mission；重复调用不重置配额或时钟",
+    "wall_clock_seconds": 600,
+    "clock_start": "本宇宙首次成功mission；此后模型调用及工具处理计入600秒，重复调用不重置配额或时钟；模型加载和结束探索后的固定积分/评分另计",
     "external_watchdog": true,
     "energy": 100,
     "observe_calls": 20,

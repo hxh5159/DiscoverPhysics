@@ -9,7 +9,7 @@ import numpy as np
 
 WORLDS = ('1', '2', '3', '4', '5', '6')
 SCALAR_WORLDS = frozenset(('1', '2', '4'))
-VERSION = 'public-development-design-1.0.0'
+VERSION = 'public-development-design-1.1.0'
 # r_min, r_max, last absolute time, maximum trajectory duration, speed limit
 LIMITS = {
     '1': (1., 8., 40., 30., 5.),
@@ -53,7 +53,7 @@ def config(world):
                                  {'min': .5, 'max': 2. if world in SCALAR_WORLDS else 4., 'default': 1.}},
             'energy_budget': 100, 'max_probes_per_launch': 8,
             'max_readouts_per_probe': 50, 'observe_calls': 20,
-            'max_times_per_observe': 50, 'wall_clock_seconds': 3600.,
+            'max_times_per_observe': 50, 'wall_clock_seconds': 600.,
             'first_light': first_light(world)}
 
 def noise_sigma(world):

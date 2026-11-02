@@ -1,8 +1,8 @@
 {
-  "protocol_version": "3.8.0",
+  "protocol_version": "3.9.0",
   "updated": "2026-11-02",
   "implementation_status": "公开Console、外层清单/起步包、私有会话服务、固定预测桥、九宇宙运行器、持久化队列与榜单已实现并做本地工程检查；目标Linux权限/GPU/模型/容量和正式profile仍待验收",
-  "revision_scope": "正式赛题构建及观测噪声1.1.0：沿用运行/服务/队列、合法成果复用及截止受理约定；增加轻量速度观测噪声，不改力场、真实积分态、数值、配额或计分公式",
+  "revision_scope": "2026-11-02单宇宙自动探索与推理限时600秒，包含模型调用及工具处理；模型加载和探索结束后的固定积分/评分另计。观测噪声1.1.0、力场、物理时间网格、配额与计分公式保持",
   "scoring_contract": "scoring.json",
   "feedback_contract": "feedback.schema.json",
   "evaluation_feedback": {
@@ -69,12 +69,12 @@
     "source_property_interventions": "按本世界公开目录解释source_properties；当前定义允许的源侧干预不改变背景位置/速度轨迹，因此observe(times)查询唯一背景，不由最近一次launch隐式切换配置。若后续改场使源侧属性影响背景，须同时修订接口，不能混用配置数据 背景几何相同不等于源属性值被忽略：本次launch或验证案例选定的source_properties仍须进入候选输入，并随探针数据记录。",
     "wall_clock_is_independent": true,
     "wall_clock_start": "本宇宙第一次成功mission调用创建会话时",
-    "wall_clock_seconds": 3600,
-    "wall_clock_definition": "从本宇宙第一次成功mission建立会话起累计的现实经过时间，不是日期钟点，不是模拟物理t，也不是48小时实训开发窗口",
+    "wall_clock_seconds": 600,
+    "wall_clock_definition": "从本宇宙第一次成功mission建立会话起累计600秒现实经过时间，包含模型调用及工具处理；模型加载与探索结束后的指挥部固定积分/评分另计。不是日期钟点、模拟物理t或48小时实训开发窗口",
     "absolute_physical_time_definition": "t_launch等绝对物理时刻相对于本宇宙统一t=0；readout为相对投放偏移，与现实墙钟无换算关系",
     "time_used_for_saving_score": false,
     "guardrail_policy": {
-      "purpose": "时间限制主要是宽松的资源护栏，防止无限时间窗口或极端长模拟请求，不以人为紧缩时间作为主要难点",
+      "purpose": "单宇宙统一600秒自动探索与推理窗口，防止无限现实运行；物理时域与单轨迹跨度仍由各宇宙公开范围约束",
       "limits_public_and_uniform": true,
       "time_requests_must_be_finite_and_within_public_bounds": true,
       "validate_before_simulation": true,
@@ -178,7 +178,7 @@
     "energy_per_new_probe": 1,
     "observe_calls": 20,
     "max_times_per_observe": 50,
-    "wall_clock_seconds": 3600,
+    "wall_clock_seconds": 600,
     "gauge_enabled": false
   },
   "fitting": {
