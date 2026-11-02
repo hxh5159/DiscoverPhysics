@@ -1,0 +1,250 @@
+从联网CPU准备到无网H200运行的完整命令
+日期：2026-11-02
+
+固定目录：
+  主项目 /inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/DiscoverPhysics
+  测试仓库 同级test目录，即.../houwenzhe/test/test
+  指挥部测试解压 同级shore-organizer-open-model-test-20261101
+  模型 /inspire/hdd/project/26-the-other-shore/public/models
+  环境 /opt/shore-h200-cu128
+  CUDA/GCC工具链 /opt/shore-h200-toolchain
+  保存的准备/校验脚本 /opt/shore-image-tools
+
+一、联网CPU阶段
+可从任意当前目录开始，脚本会明确进入共享盘BASE/PROJECT。
+先按会话提供的真实内网索引export SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST，
+以下命令保留环境变量，不在公开文档写入平台内部DNS。pip安装均由现行bootstrap使用
+env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null的格式执行。
+CPU不要求GPU、nvidia-smi或模型目录，先装Conda工具链以保证git/nvcc/编译器齐备。
+Conda用NVIDIA cuda-12.8.1标签固定12.8补丁版本；不是安装GPU驱动。
+
+运行方式：bash <<'CPU'，粘贴下列脚本正文，最后单独一行CPU。
+
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+SHARED='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026'
+BASE="$SHARED/houwenzhe/test"
+PROJECT="$BASE/DiscoverPhysics"
+ASSETS="$BASE/test"
+TESTROOT="$BASE/shore-organizer-open-model-test-20261101"
+ENVROOT='/opt/shore-h200-cu128'
+TOOLROOT='/opt/shore-h200-toolchain'
+SCRIPTS='/opt/shore-image-tools'
+PIP_MIRROR="${SHORE_PIP_MIRROR:?先设置SHORE_PIP_MIRROR}"
+PIP_MIRROR_HOST="${SHORE_PIP_MIRROR_HOST:?先设置SHORE_PIP_MIRROR_HOST}"
+
+# 项目必须位于真实共享挂载，避免mkdir产生overlay中的同名路径。
+test -d "$SHARED"
+findmnt -T "$SHARED" -o TARGET,SOURCE,FSTYPE
+case "$(findmnt -n -T "$SHARED" -o FSTYPE)" in
+  overlay|tmpfs|ramfs) echo '共享项目盘未挂载，先恢复平台挂载。' >&2; exit 2 ;;
+esac
+mkdir -p "$BASE" "$SCRIPTS"
+
+# 使用已有Conda绝对路径，重启后不依赖shell里的conda函数。
+CONDA_BIN="${CONDA_EXE:-}"
+if [ ! -x "$CONDA_BIN" ]; then
+  CONDA_BIN="$(type -P conda || true)"
+fi
+if [ ! -x "$CONDA_BIN" ]; then
+  CONDA_BIN="$SHARED/houwenzhe/miniconda3/bin/conda"
+fi
+test -x "$CONDA_BIN" || { echo '找不到已有Conda可执行文件。' >&2; exit 2; }
+
+if [ -f "$TOOLROOT/conda-meta/history" ]; then
+  CONDA_ACTION=install
+else
+  CONDA_ACTION=create
+fi
+# 只对求解器声明目标CUDA，不安装/升级宿主GPU驱动。
+CONDA_OVERRIDE_CUDA=12.8 "$CONDA_BIN" "$CONDA_ACTION" -y --prefix "$TOOLROOT" \
+  --override-channels --channel nvidia/label/cuda-12.8.1 --channel conda-forge \
+  'cuda-toolkit=12.8.1' 'gcc_linux-64=12' 'gxx_linux-64=12' \
+  'python=3.12' pip git curl make pkg-config
+
+export SHORE_CUDA128_HOME="$TOOLROOT"
+export CC="$TOOLROOT/bin/x86_64-conda-linux-gnu-gcc"
+export CXX="$TOOLROOT/bin/x86_64-conda-linux-gnu-g++"
+export PATH="$TOOLROOT/bin:$HOME/.local/bin:$PATH"
+export UV_PYTHON_INSTALL_DIR="$ENVROOT/.tools/python"
+export UV_CACHE_DIR="$ENVROOT/.cache/uv"
+export UV_PYTHON_PREFERENCE=only-managed
+export SHORE_BUILD_JOBS=2
+export GIT_TERMINAL_PROMPT=0
+"$TOOLROOT/bin/nvcc" --version
+"$TOOLROOT/bin/ptxas" --version
+"$CC" --version
+"$CXX" --version
+if command -v uv >/dev/null; then uv --version; fi
+
+sync_public_repo() {
+  local url="$1" target="$2"
+  if [ -d "$target/.git" ]; then
+    git -c credential.helper= -C "$target" pull --ff-only
+  elif [ ! -e "$target" ]; then
+    git -c credential.helper= clone "$url" "$target"
+  else
+    echo "目标已有非Git内容，停止而不覆盖：$target" >&2
+    return 2
+  fi
+}
+cd "$BASE"
+sync_public_repo https://github.com/hxh5159/DiscoverPhysics.git "$PROJECT"
+sync_public_repo https://github.com/hxh5159/test.git "$ASSETS"
+
+# 在CPU提前取齐指挥部测试资料，H200阶段无需git或下载。
+if [ -f "$TESTROOT/.test-bundle-receipt.json" ]; then
+  python3 "$ASSETS/prepare_test_bundle.py" --bundle h200 --target "$TESTROOT" --refresh
+else
+  python3 "$ASSETS/prepare_test_bundle.py" --bundle h200 --target "$TESTROOT"
+fi
+
+cp "$PROJECT/scripts/bootstrap_cuda128.sh" "$SCRIPTS/"
+cp "$PROJECT/scripts/prepare_h200_offline_cache.py" "$SCRIPTS/"
+cp "$PROJECT/scripts/verify_h200_cuda128.py" "$SCRIPTS/"
+git -C "$PROJECT" rev-parse HEAD > "$SCRIPTS/project-commit.txt"
+
+# 自动检查/复用uv，创建两个Python3.12环境，CPU不要求GPU。
+cd "$PROJECT"
+bash "$SCRIPTS/bootstrap_cuda128.sh" \
+  --cpu-build-for h200 --env-root "$ENVROOT" \
+  --index-url "$PIP_MIRROR" --trusted-host "$PIP_MIRROR_HOST"
+
+PY="$ENVROOT/.venv-trial/bin/python"
+"$PY" "$SCRIPTS/prepare_h200_offline_cache.py" --env-root "$ENVROOT" \
+  --index-url "$PIP_MIRROR" --trusted-host "$PIP_MIRROR_HOST"
+"$PY" "$SCRIPTS/prepare_h200_offline_cache.py" --env-root "$ENVROOT" --verify
+test -f "$ENVROOT/activate_h200_offline.sh"
+"$PY" -c 'import sys,numpy,scipy; print(sys.executable); print(numpy.__version__,scipy.__version__)'
+printf '\nCPU准备完成。现在在平台保存当前实例镜像，保留/opt三个目录。\n'
+printf '%s\n' "$ENVROOT" "$TOOLROOT" "$SCRIPTS"
+
+二、在平台保存镜像
+
+上段全部成功后，在平台界面保存当前CPU实例镜像；没有可凭空推定的平台保存命令。
+保留完整/opt/shore-h200-cu128、/opt/shore-h200-toolchain、/opt/shore-image-tools，
+包括虚拟环境所链接的managed Python、编译器与离线缓存，不只拷贝site-packages。
+用此镜像启动同节点4H200实例；重新挂载相同绝对路径的项目盘及模型盘。
+共享盘内容不依赖镜像保存，不将模型复制进镜像。仅为H200/SM90编译的镜像不能直接给4090用。
+
+三、无网H200阶段
+
+这一步不执行git、pip或Conda，不重新下载代码/模型。可以从任意目录启动，脚本会cd到PROJECT。
+默认27b；可在执行前export SHORE_MODEL=35b/35b-fp8/122b/122b-fp8/397b-fp8。
+397b纯BF16不适合4H200全GPU常驻。若实际模型挂载另有路径，可显式export SHORE_MODEL_ROOT。
+若新模型路径仍是overlay或空目录，先恢复共享挂载，不能靠mkdir得到另一实例已有模型。
+Qwen短烟测可能只生成思考token；以实际生成token验证链路，不将空最终文本误判为模型未加载。
+随后同一已加载服务完成六公开标准流程；实际分数/交卷质量由所用模型及策略决定。
+
+运行方式同上，将结束标记换为H200。
+
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+SHARED='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026'
+PROJECT="$SHARED/houwenzhe/test/DiscoverPhysics"
+ENVROOT='/opt/shore-h200-cu128'
+MODELROOT="${SHORE_MODEL_ROOT:-/inspire/hdd/project/26-the-other-shore/public/models}"
+MODEL="${SHORE_MODEL:-27b}"
+PY="$ENVROOT/.venv-trial/bin/python"
+MPY="$ENVROOT/.venv-vllm-cu128/bin/python"
+
+test -f "$PROJECT/shore_agent/agent.py"
+test -d "$MODELROOT"
+findmnt -T "$SHARED" -o TARGET,SOURCE,FSTYPE
+findmnt -T "$MODELROOT" -o TARGET,SOURCE,FSTYPE
+for path in "$SHARED" "$MODELROOT"; do
+  case "$(findmnt -n -T "$path" -o FSTYPE)" in
+    overlay|tmpfs|ramfs) echo "路径没有所需共享挂载：$path" >&2; exit 2 ;;
+  esac
+done
+source "$ENVROOT/activate_h200_offline.sh"
+cd "$PROJECT"
+nvidia-smi
+"$PY" /opt/shore-image-tools/verify_h200_cuda128.py --env-root "$ENVROOT" --timeout 300
+"$PY" scripts/serve_model.py --model "$MODEL" --model-root "$MODELROOT" \
+  --model-python "$MPY" --dry-run
+
+# 模型仅加载一次：先真实生成，再复用同节点服务跑六公开；退出时清理服务。
+"$PY" - "$PROJECT" "$MODELROOT" "$MPY" "$MODEL" <<'PY'
+import json, subprocess, sys
+from datetime import datetime, timezone
+from pathlib import Path
+from shore_agent.models import managed_model
+
+project, root, model_python, model = sys.argv[1:]
+stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%fZ')
+run = Path(project)/'results'/('h200-'+model+'-'+stamp)
+run.mkdir(parents=True, exist_ok=False)
+with managed_model(model, model_root=root, python_executable=model_python,
+                   startup_timeout=900, log_dir=run/'model') as client:
+    text = client.complete([{'role':'user','content':'Return the word ready.'}],
+                           max_tokens=128, timeout=180)
+    usage = client.last_response.get('usage', {})
+    tokens = usage.get('completion_tokens', usage.get('output_tokens', 0))
+    assert isinstance(tokens, int) and tokens > 0, '未获得真实生成token'
+    print(json.dumps({'model':model,'generated_tokens':tokens,
+                      'text':text[:300],'usage':usage}, ensure_ascii=False), flush=True)
+    subprocess.run([sys.executable, '-m', 'development_worlds.runner',
+                    '--worlds','1','2','3','4','5','6', '--model',model,
+                    '--base-url',client.base_url, '--output',str(run/'six-public')],
+                   cwd=project, check=True)
+print('结果：'+str(run/'six-public'/'summary.json'))
+PY
+
+四、可选：指挥部九隐藏完整测试
+
+平台保存镜像不等于Docker本地镜像。此分支需要平台已支持Docker/NVIDIA容器、
+可被docker image inspect识别的离线基础镜像（其中已有/opt环境），并且四GPU空闲。
+先停止六公开共享服务释放GPU。设置LOCAL_BASE_IMAGE为实际本地镜像tag/ID，不填写假sha256。
+上述条件不是单纯安装Python依赖可创造的；若平台不支持嵌套Docker，应由平台提供等价隔离端。
+下面是指挥部内部测试数据库，不是正式榜单，不需要虚构48小时正式截止时间。
+代码与参数固定源来自r6同包SDK，source env_open_models.sh绑定RIFT_PUBLIC_ROOT到TESTROOT，
+不要用另一份Git检出覆盖其profile所绑定的SDK字节。
+
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+# 仅当H200节点已经支持Docker/NVIDIA容器，并已有本地离线基础镜像时执行。
+: "${LOCAL_BASE_IMAGE:?先设置实际可被docker image inspect找到的本地基础镜像}"
+BASE='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test'
+TESTROOT="$BASE/shore-organizer-open-model-test-20261101"
+ENVROOT='/opt/shore-h200-cu128'
+MODEL="${SHORE_MODEL:-27b}"
+MODELROOT="${SHORE_MODEL_ROOT:-/inspire/hdd/project/26-the-other-shore/public/models}"
+PY="$ENVROOT/.venv-trial/bin/python"
+source "$ENVROOT/activate_h200_offline.sh"
+source "$TESTROOT/env_open_models.sh"
+cd "$TESTROOT"
+docker version
+docker image inspect "$LOCAL_BASE_IMAGE" >/dev/null
+
+RUNROOT="$TESTROOT/results/nine-$(date -u +%Y%m%dT%H%M%S)-$$"
+mkdir -m 700 -p "$RUNROOT"
+PUBLICROOT="$RUNROOT/participant"
+"$PY" "$BASE/test/prepare_test_bundle.py" --bundle starter --target "$PUBLICROOT"
+MANIFEST="organizer-smoke-$(date -u +%Y%m%dT%H%M%S)-$$.json"
+cd "$PUBLICROOT"
+"$PY" scripts/make_submission.py --model "$MODEL" --team-id organizer-demo \
+  --submission-id "smoke-$(date -u +%Y%m%dT%H%M%S)-$$" --output "$MANIFEST"
+"$PY" scripts/build_runtime_images.py --base-image "$LOCAL_BASE_IMAGE" \
+  --manifest "$MANIFEST" --agent-tag shore-agent:organizer-smoke \
+  --candidate-tag shore-candidate:organizer-smoke --output "$RUNROOT/image-ids.json"
+cd "$TESTROOT"
+AGENT_IMAGE="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["agent_image"])' "$RUNROOT/image-ids.json")"
+CANDIDATE_IMAGE="$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["candidate_image"])' "$RUNROOT/image-ids.json")"
+"$PY" configure_runtime.py configure --profile profiles/internal-v9/profile.json \
+  --output "$RUNROOT/site.json" --candidate-image-id "$CANDIDATE_IMAGE" \
+  --model-root "$MODELROOT" --models "$MODEL" --gpu-devices 0 1 2 3
+"$PY" configure_runtime.py preflight --profile "$RUNROOT/site.json" --output "$RUNROOT/preflight.json"
+"$PY" configure_runtime.py model-smoke --profile "$RUNROOT/site.json" \
+  --agent-image-id "$AGENT_IMAGE" --models "$MODEL" --output "$RUNROOT/model-smoke.json"
+"$PY" contest_platform.py intake --db "$RUNROOT/internal.sqlite" --manifest "$PUBLICROOT/$MANIFEST" \
+  --image "$AGENT_IMAGE" --submission-root "$PUBLICROOT" --team-id organizer-demo --internal-validation
+"$PY" contest_platform.py work-once --db "$RUNROOT/internal.sqlite" --profile "$RUNROOT/site.json" \
+  --run-root "$RUNROOT/runs" --worker-id organizer-check --internal-validation
+printf '\n九隐藏内部测试资料：%s\n' "$RUNROOT"

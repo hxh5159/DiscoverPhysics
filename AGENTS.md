@@ -1239,6 +1239,16 @@ activate_h200_offline.sh开启HF离线和FlashInfer禁止下载并恢复缓存/�
 
 当前文档：QUICKSTART、PARTICIPANT_FILES、MODEL_RUNTIME、MODELS、FILE_GUIDE及RUN_READINESS_CHECK；指挥部细节与原始验证报告留仓外。两个仓库按长期约定完成检查后自动提交推送，最终状态以Git核对为准。
 
+### 7.79 CPU制镜像与H200运行的完整命令及执行目录（2026-11-02）
+
+用户要求明确克隆位置、各阶段执行目录及从安装到运行的全套命令。沿用实际共享项目根：主库`/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/DiscoverPhysics`，测试库同级`test`，指挥部r6解压同级`shore-organizer-open-model-test-20261101`；模型默认仍`/inspire/hdd/project/26-the-other-shore/public/models`。项目/权重由H200重新挂载，不要求随镜像复制；环境/工具链/校验脚本分别放镜像内`/opt/shore-h200-cu128`、`/opt/shore-h200-toolchain`及`/opt/shore-image-tools`。
+
+完整命令在`docs/REMOTE_CPU_H200_COMMANDS.txt`，平台内网PyPI值通过会话或外部环境变量传入，不写公开文档。CPU从任意cwd启动，先确认真实共享挂载、用现有Conda绝对路径装固定NVIDIA12.8.1标签Toolkit与GCC/G++12、git等，再clone/pull两库并预解压测试资料；不运行nvidia-smi或模型。显式固定UV_PYTHON_INSTALL_DIR/cache到/opt及only-managed，避免继承旧共享盘解释器路径，使用CPU H200构建模式和离线缓存准备/校验后才保存平台镜像。平台保存属于用户平台操作，不虚构CLI。
+
+H200阶段在同路径挂载共享盘，source离线环境，使用trial Python验收/运行、model Python启动vLLM，不执行git/pip/Conda下载。提供一次加载模型→真实token烟测→复用同节点本机服务完成六公开的命令，避免无必要反复加载。默认27b，其余预设通过SHORE_MODEL指定；397B纯BF16容量限制保持。新模型目录若是overlay/空目录需先修真实挂载，不能把mkdir当作共享盘已就绪。
+
+九隐藏可选完整内部测试另列：需要真实Docker/NVIDIA容器及本地可inspect的离线基础镜像，平台镜像保存并不自动满足该条件；从独立starter目录构建镜像，真实receipt取得镜像ID，再按r6同包SDK配置/预检/真实生成/内部受理和运行，不使用虚构sha256、不把local-diagnostic当生产隔离。命令已做Bash语法与现行CLI核对；本轮无实际远端安装、模型/GPU或外部API模拟，执行规则与当前ZIP不变。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
@@ -1496,3 +1506,5 @@ N-body 与网格场后端有边界、平滑和离散方式的差异，不能默�
 | 2026-11-02 | 审计实际starter-v3/r5/internal-v8：公开包不含隐藏真值且六公开数值/评分原型可用，但缺六公开发放、LLM基线与统一驱动，正式科学/模型/镜像profile及隐藏材料留存仍未接入；不把安装完成当作完整参赛就绪。只新增检查报告及记忆，未改规则/程序/ZIP或调用模型，见7.77。 |
 
 | 2026-11-02 | 完成六公开完整发放、可运行LLM基础框架及统一Console，迁入最新九隐藏/覆盖并重生成参考；统一七模型/cu128/venv路径、关闭隐藏导出、提供实际镜像与发布配置工具。新交付v4/r6/v9，179公开回归及15界75合成请求通过，不冒充真实模型/GPU验收；旧包和用户文稿保留，见7.78。 |
+
+| 2026-11-02 | 整理CPU联网制镜像→H200无网的精确目录与全套命令，补Conda工具链/git先安装、UV解释器随镜像、共享挂载检查、单次模型加载复用六公开及九隐藏Docker可选分支；仅新命令说明/记忆，未改程序或包、未实际安装运行，见7.79。 |
