@@ -7,10 +7,13 @@ initialize CUDA, or download a model.
 from __future__ import annotations
 
 import os
+import hashlib
+import json
 from pathlib import Path
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -127,6 +130,85 @@ class BootstrapCuda128PathsTests(unittest.TestCase):
         self.assertIn("2.11.0+cu128", result.stdout)
         self.assertIn("0.24.0", result.stdout)
         self.assert_no_tools()
+
+    def test_cpu_h200_plan_needs_no_gpu_or_tool_execution(self) -> None:
+        target = self.base / "cpu-h200"
+        result = self.invoke("--env-root", shell_path(target), "--cpu-build-for", "h200", "--plan")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("TORCH_CUDA_ARCH_LIST=9.0", result.stdout)
+        self.assertIn("GPU validation deferred", result.stdout)
+        self.assertFalse(target.exists())
+        self.assert_no_tools()
+
+    def test_unknown_cpu_build_target_is_rejected_without_tools(self) -> None:
+        self.assert_rejected("--env-root", shell_path(self.base / "invalid-target"),
+                             "--cpu-build-for", "unknown", "--plan")
+
+    def h200_guard(self, target: Path) -> subprocess.CompletedProcess[str]:
+        source = SCRIPT.read_text(encoding="utf-8").split(
+            "# BEGIN H200_PROFILE_GUARD\n", 1)[1].split(
+                "# END H200_PROFILE_GUARD", 1)[0]
+        # Execute the actual stdlib-only guard without the install/GPU paths.
+        return subprocess.run([sys.executable, "-c", source, str(target)],
+                              capture_output=True, text=True, timeout=15)
+
+    def h200_state(self, target: Path, *, completed: bool = True) -> dict:
+        package = target / ".venv-vllm-cu128/lib/python3.12/site-packages/vllm"
+        package.mkdir(parents=True)
+        (package.parent / "vllm-0.24.0.dist-info").mkdir()
+        records = []
+        for stem in ("_C_stable_libtorch", "_moe_C_stable_libtorch"):
+            path = package / (stem + ".abi3.so")
+            path.write_bytes((stem + " SM90 fixture").encode())
+            records.append({"stem": stem, "path": path.relative_to(target).as_posix(),
+                            "size": path.stat().st_size,
+                            "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+        return {"schema_version": "1.0.0", "target": "h200", "target_cuda_arch": "9.0",
+                "torch_cuda": "12.8", "build_host": "cpu", "cpu_stage_completed": completed,
+                "gpu_validation_performed": False, "model_loaded": False,
+                "stable_extensions": records, "offline_cache_prepared": False}
+
+    def test_existing_vllm_requires_completed_h200_provenance(self) -> None:
+        target = self.base / "incomplete-cpu-build"
+        state = self.h200_state(target, completed=False)
+        path = target / "cuda128-build-manifest.json"
+        result = self.h200_guard(target)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("fresh --env-root", result.stderr)
+        path.write_text(json.dumps(state), encoding="utf-8")
+        result = self.h200_guard(target)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("incomplete CPU build", result.stderr)
+        self.assertEqual(json.loads(path.read_text()), state)
+
+    def test_completed_h200_build_requires_both_unchanged_extension_files(self) -> None:
+        target = self.base / "completed-h200"
+        state = self.h200_state(target)
+        path = target / "cuda128-build-manifest.json"
+        path.write_text(json.dumps(state), encoding="utf-8")
+        before = path.read_bytes()
+        result = self.h200_guard(target)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "1")
+        self.assertEqual(path.read_bytes(), before)
+        # Replacing an installed package with a same-version SM89 build must
+        # not become a successful H200 build merely because pip is a no-op.
+        changed = target / state["stable_extensions"][0]["path"]
+        changed.write_bytes(b"same-version SM89 replacement")
+        result = self.h200_guard(target)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("bytes differ", result.stderr)
+
+    def test_h200_guard_rejects_wrong_profile_and_missing_fingerprints(self) -> None:
+        target = self.base / "wrong-profile"
+        state = self.h200_state(target)
+        path = target / "cuda128-build-manifest.json"
+        for wrong in ({**state, "target_cuda_arch": "8.9"},
+                      {**state, "stable_extensions": []},
+                      {**state, "stable_extensions": state["stable_extensions"][:1]}):
+            with self.subTest(state=wrong):
+                path.write_text(json.dumps(wrong), encoding="utf-8")
+                self.assertNotEqual(self.h200_guard(target).returncode, 0)
 
     def test_plan_preserves_old_environment_results_and_cache(self) -> None:
         target = self.base / "existing"
