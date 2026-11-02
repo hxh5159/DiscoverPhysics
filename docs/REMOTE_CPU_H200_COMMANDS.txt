@@ -2,9 +2,9 @@
 日期：2026-11-02
 
 固定目录：
-  主项目 /inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/DiscoverPhysics
-  测试仓库 同级test目录，即.../houwenzhe/test/test
-  指挥部测试解压 同级shore-organizer-open-model-test-20261101
+  主项目 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics
+  测试仓库 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/test
+  指挥部测试解压 /inspire/hdd/project/26-the-other-shore/fengkairui-25026/shore-organizer-open-model-test-20261101
   模型 /inspire/hdd/project/26-the-other-shore/public/models
   环境 /opt/shore-h200-cu128
   CUDA/GCC工具链 /opt/shore-h200-toolchain
@@ -17,6 +17,7 @@
 env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null的格式执行。
 CPU不要求GPU、nvidia-smi或模型目录，先装Conda工具链以保证git/nvcc/编译器齐备。
 Conda用NVIDIA cuda-12.8.1标签固定12.8补丁版本；不是安装GPU驱动。
+Conda优先使用当前CONDA_EXE或PATH；找不到时检查原安装位置，不将旧项目目录继续作为源码路径。
 
 运行方式：bash <<'CPU'，粘贴下列脚本正文，最后单独一行CPU。
 
@@ -24,8 +25,8 @@ Conda用NVIDIA cuda-12.8.1标签固定12.8补丁版本；不是安装GPU驱动�
 set -euo pipefail
 umask 077
 
-SHARED='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026'
-BASE="$SHARED/houwenzhe/test"
+SHARED='/inspire/hdd/project/26-the-other-shore/fengkairui-25026'
+BASE="$SHARED"
 PROJECT="$BASE/DiscoverPhysics"
 ASSETS="$BASE/test"
 TESTROOT="$BASE/shore-organizer-open-model-test-20261101"
@@ -49,7 +50,8 @@ if [ ! -x "$CONDA_BIN" ]; then
   CONDA_BIN="$(type -P conda || true)"
 fi
 if [ ! -x "$CONDA_BIN" ]; then
-  CONDA_BIN="$SHARED/houwenzhe/miniconda3/bin/conda"
+  # 项目迁移不代表原Conda安装被移动；仅在原可执行文件仍存在时复用。
+  CONDA_BIN='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/miniconda3/bin/conda'
 fi
 test -x "$CONDA_BIN" || { echo '找不到已有Conda可执行文件。' >&2; exit 2; }
 
@@ -144,8 +146,8 @@ Qwen短烟测可能只生成思考token；以实际生成token验证链路，不
 set -euo pipefail
 umask 077
 
-SHARED='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026'
-PROJECT="$SHARED/houwenzhe/test/DiscoverPhysics"
+SHARED='/inspire/hdd/project/26-the-other-shore/fengkairui-25026'
+PROJECT="$SHARED/DiscoverPhysics"
 ENVROOT='/opt/shore-h200-cu128'
 MODELROOT="${SHORE_MODEL_ROOT:-/inspire/hdd/project/26-the-other-shore/public/models}"
 MODEL="${SHORE_MODEL:-27b}"
@@ -202,7 +204,7 @@ PY
 先停止六公开共享服务释放GPU。设置LOCAL_BASE_IMAGE为实际本地镜像tag/ID，不填写假sha256。
 上述条件不是单纯安装Python依赖可创造的；若平台不支持嵌套Docker，应由平台提供等价隔离端。
 下面是指挥部内部测试数据库，不是正式榜单，不需要虚构48小时正式截止时间。
-代码与参数固定源来自r6同包SDK，source env_open_models.sh绑定RIFT_PUBLIC_ROOT到TESTROOT，
+代码与参数固定源来自当前测试包的同包SDK，source env_open_models.sh绑定RIFT_PUBLIC_ROOT到TESTROOT，
 不要用另一份Git检出覆盖其profile所绑定的SDK字节。
 
 #!/usr/bin/env bash
@@ -211,7 +213,7 @@ umask 077
 
 # 仅当H200节点已经支持Docker/NVIDIA容器，并已有本地离线基础镜像时执行。
 : "${LOCAL_BASE_IMAGE:?先设置实际可被docker image inspect找到的本地基础镜像}"
-BASE='/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test'
+BASE='/inspire/hdd/project/26-the-other-shore/fengkairui-25026'
 TESTROOT="$BASE/shore-organizer-open-model-test-20261101"
 ENVROOT='/opt/shore-h200-cu128'
 MODEL="${SHORE_MODEL:-27b}"

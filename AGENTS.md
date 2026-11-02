@@ -30,6 +30,8 @@
 
 **执行环境长期约束：项目实际在用户的远端 Linux 环境运行。提供给用户的安装、下载、训练、自测、评测及启动命令，均以远端为执行位置；具体路径和同步方式见第 3.4 节。**
 
+**远端路径最新约定（2026-11-02，长期有效）：** 主项目固定为`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics`，测试资料库固定为同级`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/test`；除用户另行说明，后续所有命令使用这两个路径。模型根仍为`/inspire/hdd/project/26-the-other-shore/public/models`，镜像内`/opt/shore-*`环境位置不变。此前urbanlowaltitude下的项目/测试路径仅作历史；原Conda若仍装在旧位置，可作为现存工具使用，不表示项目仍在那里。详见7.80。
+
 阅读导航：第 2—4 节是当前要求与交付边界；第 5—9 节是资料、论文和代码认识；第 10—12 节是后续清单、完成状态和变更记录。
 
 ## 1. 阅读与维护方式
@@ -169,7 +171,9 @@
 
 | 用途 | 当前路径或约定 |
 | --- | --- |
-| 远端项目目录 | `/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/DiscoverPhysics` |
+| 远端项目目录 | `/inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics`（2026-11-02用户更新，长期默认） |
+| 远端测试资料库 | `/inspire/hdd/project/26-the-other-shore/fengkairui-25026/test`（与主项目同级） |
+| 当前H200测试包解压目录 | `/inspire/hdd/project/26-the-other-shore/fengkairui-25026/shore-organizer-open-model-test-20261101` |
 | 远端自下载模型目录 | `/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/models` |
 | 当前统一模型目录（2026-11-01） | `/inspire/hdd/project/26-the-other-shore/public/models`；用户指定的最终统一目录。最新同终端可见27B（du为52G）与122B-FP8目录，但findmnt明确为`/ overlay overlay`，尚不是当前作业的GPFS项目挂载；不能当作七模型已共享交付。正确公共挂载/实际共享路径仍待平台确认，原指定目标不擅自改名 |
 | 本轮复制源根目录 | `/inspire/hdd/global_public/public_models/Qwen`；完整七项源与目标映射见下表，不移动或删除原模型 |
@@ -178,7 +182,7 @@
 | 本地编辑目录 | `C:\Users\hwz\Desktop\秋\26秋\DiscoverPhysics` |
 | 代码同步来源 | 用户的 GitHub 仓库 `hxh5159/DiscoverPhysics` |
 | 同步节点 | 自2026-11-01起，修改仓库后完成相应检查即自动Git commit并推送至对应origin，不再等额外提醒；无改动不空提交。用户明确要求仅本地保存或暂停推送时除外 |
-| 私有测试资料同步 | `hxh5159/test`，保持private；本地`../test-assets`，用户远端实际克隆路径`/inspire/hdd/project/urbanlowaltitude/fengkairui-25026/houwenzhe/test/test`。真实模拟器、真值和测试工作流不得因自动同步进入公开主仓库 |
+| 指挥部测试资料同步 | `hxh5159/test`，按用户7.74明确授权为public；本地`../test-assets`，远端`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/test`。公开可见性不改变正式参赛资料的发放边界，不把真实模拟器、真值或指挥部测试工作流自动混入参赛包 |
 
 **统一模型目录的七项清单（2026-11-01用户指定）：** 下列每行的源路径为 `/inspire/hdd/global_public/public_models/Qwen/<目录名>`，目标为 `/inspire/hdd/project/26-the-other-shore/public/models/<目录名>`。用户后六项未写开头的`/`，按绝对路径补齐；目录名不自行改写，尤其第三项确为`Qwen-3.6-35B-A3B-FP8`。
 
@@ -1249,6 +1253,12 @@ H200阶段在同路径挂载共享盘，source离线环境，使用trial Python�
 
 九隐藏可选完整内部测试另列：需要真实Docker/NVIDIA容器及本地可inspect的离线基础镜像，平台镜像保存并不自动满足该条件；从独立starter目录构建镜像，真实receipt取得镜像ID，再按r6同包SDK配置/预检/真实生成/内部受理和运行，不使用虚构sha256、不把local-diagnostic当生产隔离。命令已做Bash语法与现行CLI核对；本轮无实际远端安装、模型/GPU或外部API模拟，执行规则与当前ZIP不变。
 
+### 7.80 远端主项目与测试库迁至新项目空间（2026-11-02）
+
+用户指定长期默认：`BASE=/inspire/hdd/project/26-the-other-shore/fengkairui-25026`，主库`$BASE/DiscoverPhysics`，测试库`$BASE/test`；未另行说明时不再使用旧urbanlowaltitude项目路径。H200测试包解压到同级`$BASE/shore-organizer-open-model-test-20261101`，4090测试包同理；模型根保持`/inspire/hdd/project/26-the-other-shore/public/models`，镜像中的三个`/opt/shore-*`目录保持。7.79及更早记录中的路径为历史值。
+
+`docs/REMOTE_CPU_H200_COMMANDS.txt`已据此重写全套CPU联网准备→平台保存镜像→H200无网验收和六公开流程，并保留九隐藏Docker内部测试分支。CPU和H200阶段检查新项目与模型的实际共享挂载，不以创建同名overlay目录冒充共享盘；旧Conda只在其可执行文件实际存在时作为工具兜底，不能因项目迁移虚构新的Conda路径。测试包环境脚本同步为按解压位置寻找同级主项目，已有结果与历史包保留；路径修订不改真实力场、噪声、评分、600秒或模型选择，不运行新的模型/API/物理模拟，也不把本机语法检查当作远端验收。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
@@ -1508,3 +1518,5 @@ N-body 与网格场后端有边界、平滑和离散方式的差异，不能默�
 | 2026-11-02 | 完成六公开完整发放、可运行LLM基础框架及统一Console，迁入最新九隐藏/覆盖并重生成参考；统一七模型/cu128/venv路径、关闭隐藏导出、提供实际镜像与发布配置工具。新交付v4/r6/v9，179公开回归及15界75合成请求通过，不冒充真实模型/GPU验收；旧包和用户文稿保留，见7.78。 |
 
 | 2026-11-02 | 整理CPU联网制镜像→H200无网的精确目录与全套命令，补Conda工具链/git先安装、UV解释器随镜像、共享挂载检查、单次模型加载复用六公开及九隐藏Docker可选分支；仅新命令说明/记忆，未改程序或包、未实际安装运行，见7.79。 |
+
+| 2026-11-02 | 用户更新长期远端路径：主库和test同放26-the-other-shore/fengkairui-25026，模型根及/opt环境不变；完整CPU制镜像/H200无网命令和现行测试包路径同步，保留历史包与结果。仅路径/文档和离线包检查，不运行模型或新科学模拟，见7.80。 |
