@@ -1,0 +1,78 @@
+CUDA 12.8 模型部署与项目运行环境
+
+环境安装与仓库同步是两个独立操作。安装不需要访问任何私有仓库或登录GitHub。
+bootstrap_cuda128.sh只安装环境，不下载模型、不启动推理或实验，不改GPU驱动。
+
+目标版本：
+  CPU：Python3.12、numpy2.1.3、scipy1.15.3、pytest8。
+  GPU：Python3.12、torch2.11.0+cu128、torchvision0.26.0+cu128、
+       torchaudio2.11.0+cu128、vLLM0.24.0源码构建、transformers5.8.0。
+
+vLLM采用源码构建，是为了与已有CUDA12.8/Torch cu128匹配；不使用默认CUDA13 wheel。
+源码包由Python包索引获取，不再克隆vLLM仓库。构建仍可能通过git下载公开第三方源码，
+因此需要网络；不需要GitHub账号。GIT_TERMINAL_PROMPT=0避免登录提示阻塞。
+普通Python依赖使用调用方指定的索引，Torch cu128与vLLM源码另允许官方链接。
+这不是纯内网/离线安装；安装包和编译源码的远端可用性仍需实际执行验证。
+
+一、前置条件
+Linux x86_64、glibc>=2.28、同节点已分配的四张可见GPU、git、curl、GCC/G++11.3至14，
+以及完整CUDA Toolkit12.8（含nvcc）。nvidia-smi的CUDA标签不能替代nvcc检查。
+uv若已有会复用；没有时按指定pip索引安装。Python3.12由uv创建隔离环境。
+若Toolkit不在默认位置：export SHORE_CUDA128_HOME='/真实CUDA12.8目录'。
+若使用独立编译器，可设置CC/CXX为相应GCC/G++可执行文件的绝对路径。
+
+二、安装
+先下载或从项目取出 scripts/bootstrap_cuda128.sh，再运行：
+
+bash bootstrap_cuda128.sh \
+  --env-root '/已有父目录下的环境目录' \
+  --index-url '<用户指定的PyPI索引URL>' \
+  --trusted-host '<该索引主机名>'
+
+参数--env-root不要求包含项目或私有包，可与已有测试包共用目录。
+只创建/复用.venv-trial和.venv-vllm-cu128，不删除旧.venv-vllm、日志、结果或缓存。
+目标父目录必须存在；非环境文件、未完成环境及用户自写的激活脚本会被保护并明确报错。
+加--plan只检查路径并显示版本计划，不创建目录、不安装、不联网或调用GPU。
+
+所有pip install均采用：
+env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
+  <目标Python> -m pip install ... --index-url ... --trusted-host ... --no-cache-dir
+
+安装包含依赖一致性检查、每卡BF16计算、Torch CUDA12.8、vLLM扩展、
+qwen3 reasoning parser及serve帮助检查；记录版本冻结到bootstrap-cu128-logs.*。
+这些检查不等同于模型加载/FP8/多卡通信或完整项目实验成功。
+
+三、新终端/实例重启后
+先重新分配同类GPU，并确认环境目录所在存储已挂载，再执行：
+source '/环境目录/activate_cuda128.sh'
+
+此文件恢复Python、CUDA_HOME、编译器与真实Toolkit库路径，剔除stub driver路径。
+它保留调度器的CUDA_VISIBLE_DEVICES，不会自行选择未分配GPU。
+若更换GPU架构，须重新检查/构建对应配置，不能把单一架构的源码构建直接视为通用镜像。
+
+四、启动本地模型
+先选一份真实存在的本地模型目录（示例用27B），同一组四卡依次测试模型：
+
+export VLLM_USE_RUST_FRONTEND=0
+vllm serve '/实际模型目录' \
+  --host 127.0.0.1 --port 8000 --served-model-name Qwen3.8-27B \
+  --tensor-parallel-size 4 --dtype bfloat16 \
+  --max-model-len 32768 --max-num-seqs 1 --gpu-memory-utilization 0.90 \
+  --enforce-eager --disable-custom-all-reduce --reasoning-parser qwen3 \
+  --limit-mm-per-prompt '{"image":0,"video":0}'
+
+对本项目的校准客户端，served-model-name须使用其允许的模型标识，不随意换别名。
+122B-FP8替换模型目录及对应服务名即可尝试加载，保留自动识别checkpoint量化。
+不要用锁定旧0.32/cu129的启动器或检查器检查这个独立0.24/cu128环境。
+
+五、与项目程序连接
+实验/评分使用 /环境目录/.venv-trial/bin/python；推理使用独立vLLM进程。
+模型服务地址为http://127.0.0.1:8000/v1，两端应在同一节点。
+先验证chat/completions真实生成，再运行现有实验客户端。
+不需要为当前NumPy/SciPy实验、law.py积分或标准库HTTP客户端重复安装Torch。
+原研究基线的两个editable子包不包含vLLM模型自部署环境，不能代替此步骤。
+原研究基线与当前赛题程序不同，若要单独复现，应另建环境。
+
+模型架构支持与硬件容量分别验收。4x48GB4090优先27B/35B及122B-FP8；
+122B BF16和397B模型不能据此宣称可全GPU常驻。397B-FP8可在更大资源如4H200上另验。
+安装不会自动量化、上传/下载权重、占用模型API或开展训练。
