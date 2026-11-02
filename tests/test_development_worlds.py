@@ -36,7 +36,7 @@ class DevelopmentTests(unittest.TestCase):
                 a=con.launch(**cfg['first_light']);b=con.launch(**cfg['first_light'])
                 self.assertEqual(con.budget['energy_used'],4)
                 self.assertNotEqual(a['positions'],b['positions'])
-                self.assertEqual(a['velocities'],b['velocities'])
+                self.assertNotEqual(a['velocities'],b['velocities'])
                 self.assertEqual(con.archive()['observations'],con.archive()['observations'])
                 with self.assertRaises(ValueError):con.observe([.001])
                 self.assertEqual(con.budget['observe_used'],0)

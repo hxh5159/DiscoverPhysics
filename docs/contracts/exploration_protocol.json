@@ -1,8 +1,8 @@
 {
   "protocol_version": "3.8.0",
-  "updated": "2026-10-31",
+  "updated": "2026-11-02",
   "implementation_status": "公开Console、外层清单/起步包、私有会话服务、固定预测桥、九宇宙运行器、持久化队列与榜单已实现并做本地工程检查；目标Linux权限/GPU/模型/容量和正式profile仍待验收",
-  "revision_scope": "开始正式赛题构建；增加外层运行/服务/队列契约，确认合法成果跨提交复用及截止前受理可延后评完；不改力场、数值、配额或计分公式",
+  "revision_scope": "正式赛题构建及观测噪声1.1.0：沿用运行/服务/队列、合法成果复用及截止受理约定；增加轻量速度观测噪声，不改力场、真实积分态、数值、配额或计分公式",
   "scoring_contract": "scoring.json",
   "feedback_contract": "feedback.schema.json",
   "evaluation_feedback": {
@@ -30,7 +30,7 @@
       "投放区",
       "v_max",
       "允许投放与观测的绝对物理时间范围",
-      "请求与返回格式、字段含义及已公开的噪声规则",
+      "请求与返回格式、字段含义及已公开的噪声规则（含noise_version、探针速度分布及速度标准差相对公开初速上限的比例）",
       "配额余额、费用和调用/读数上限",
       "独立墙钟余量",
       "first_light",
@@ -57,7 +57,7 @@
       "隐藏源数量",
       "隐藏天体状态"
     ],
-    "clean_initial_state_policy": "统一提供可见背景在共同物理t=0的干净位置和速度，作为已知初始条件；仅提供本世界公开目录中已知的属性。原始控制p1/p2不自动揭示其源/响应/惯性映射，不提供真实隐藏源状态或未公开属性；后续位置观测仍按既定规则加噪。"
+    "clean_initial_state_policy": "统一提供可见背景在共同物理t=0的干净位置和速度，作为已知初始条件；仅提供本世界公开目录中已知的属性。原始控制p1/p2不自动揭示其源/响应/惯性映射，不提供真实隐藏源状态或未公开属性；已知探针投放pos、vel也是精确命令输入，后续位置与探针速度观测按observation_noise.json加噪。"
   },
   "time_model": {
     "physical_origin": "整局为本宇宙定义同一个物理t=0及固定背景初态，不按每次调用重置原点",
@@ -125,7 +125,7 @@
       "absolute_readout_times"
     ],
     "position_noise": "沿用observation_noise.json：sigma=.01*L_launch；逐坐标独立高斯，生成一次缓存",
-    "probe_velocity_noise": "不额外加噪声",
+    "probe_velocity_noise": "沿用observation_noise.json：sigma_v=.0001*initial_speed_max；逐坐标、探针与时刻独立高斯，与普通launch相同，生成一次缓存",
     "energy_charge": 0,
     "observe_call_charge": 0,
     "generated_once_per_session": true,
@@ -397,6 +397,7 @@
   },
   "framework_reuse_policy": "用户明确：除统一被动探针、observe/launch分工、第一束光、配额等已定差异，优先改造DP已有框架和数据流；不无故自创额外流程，逐项检查是否适合人类竞赛的隔离与客观评分",
   "observation_noise_contract": "observation_noise.json",
+  "observation_noise_version": "1.1.0",
   "runtime_contract": "runtime.json",
   "outer_submission_contract": "submission.schema.json"
 }

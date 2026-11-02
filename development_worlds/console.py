@@ -19,7 +19,10 @@ from .worlds import (
 )
 
 
-PROTOCOL_VERSION = "trial-console-1.1.0"
+PROTOCOL_VERSION = "trial-console-1.2.0"
+OBSERVATION_NOISE_VERSION = "1.1.0"
+VELOCITY_NOISE_ALPHA = 1e-4
+VELOCITY_STREAM_TAG = 0x56454C
 
 
 def _json_copy(value):
@@ -52,6 +55,9 @@ class DevelopmentConsole:
         self._clock = clock
         self._started_at = None
         self._rng = np.random.default_rng(int(seed))
+        # Keep the position stream unchanged when adding velocity observations.
+        self._velocity_rng = np.random.default_rng(
+            np.random.SeedSequence([int(seed), VELOCITY_STREAM_TAG]))
         self._energy_used = 0
         self._observe_used = 0
         self._launch_calls = 0
@@ -59,6 +65,7 @@ class DevelopmentConsole:
         self._mission_payload = None
         self._transcript = []
         self._configure()
+        self._velocity_sigma = VELOCITY_NOISE_ALPHA * self._speed
 
     @staticmethod
     def _positive_limit(config, name, default):
@@ -187,6 +194,11 @@ class DevelopmentConsole:
         array = np.asarray(positions, dtype=np.float64)
         return (array + self._rng.normal(0.0, self._sigma, size=array.shape)).tolist()
 
+    def _noise_velocities(self, velocities):
+        array = np.asarray(velocities, dtype=np.float64)
+        return (array + self._velocity_rng.normal(
+            0.0, self._velocity_sigma, size=array.shape)).tolist()
+
     @property
     def budget(self):
         elapsed = 0.0 if self._started_at is None else max(0.0, float(self._clock() - self._started_at))
@@ -211,7 +223,7 @@ class DevelopmentConsole:
         background = self._sim.background(truth["times"])
         return {**_json_copy(request), "times": truth["times"].tolist(),
                 "positions": self._noise_positions(truth["positions"]),
-                "velocities": truth["velocities"].tolist(),
+                "velocities": self._noise_velocities(truth["velocities"]),
                 "visible_background_positions": self._noise_positions(background["positions"]),
                 "background_ids": list(background["ids"])}
 
@@ -246,8 +258,13 @@ class DevelopmentConsole:
                     "max_probes_per_launch": self._max_probes, "max_readouts_per_probe": self._max_readouts,
                     "observe_calls": self._observe_limit, "max_times_per_observe": self._max_observe_times,
                     "wall_clock_seconds": self._wall_seconds},
-                "noise": {"positions": "independent Gaussian per coordinate on each new observation",
-                          "probe_velocities": "no additional noise", "cached_data": "not re-noised"},
+                "noise": {"noise_version": OBSERVATION_NOISE_VERSION,
+                          "positions": "independent Gaussian per coordinate on each new observation",
+                          "probe_velocities": "independent Gaussian per coordinate, probe and returned time on each new experiment",
+                          "velocity_sigma_fraction_of_initial_speed_max": VELOCITY_NOISE_ALPHA,
+                          "velocity_sigma": self._velocity_sigma,
+                          "velocity_sigma_rule": "velocity_sigma_fraction_of_initial_speed_max * public initial_speed_max",
+                          "cached_data": "not re-noised"},
                 "first_light": first,
             }
         self._ensure_active()
@@ -284,7 +301,7 @@ class DevelopmentConsole:
         request = {"probes": normalized, "t_launch": launch, "readout": offsets, "source_properties": source}
         result = {"experiment_id": f"L{self._launch_calls:04d}", **request,
                   "times": truth["times"].tolist(), "positions": positions,
-                  "velocities": truth["velocities"].tolist(), "budget": self.budget}
+                  "velocities": self._noise_velocities(truth["velocities"]), "budget": self.budget}
         self._observations.append(_json_copy(result))
         return self._record("launch", request, result)
 

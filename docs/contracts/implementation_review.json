@@ -1,7 +1,7 @@
 {
-  "review_version": "1.10.0",
-  "review_date": "2026-11-01",
-  "scope": "正式比赛运行系统构建与本地工程验收；预言映射统一恢复10e，其他物理与计分规则保留，远端Linux/GPU/权限/容量及正式profile未验收",
+  "review_version": "1.11.0",
+  "review_date": "2026-11-02",
+  "scope": "正式比赛运行系统构建与本地工程验收；观测噪声更新为1.1.0，增加轻量探针速度噪声；真实力场、积分态、10e计分和配额保持，远端Linux/GPU/权限/容量及正式profile未验收",
   "basis": {
     "statement": "docs/彼岸物理规律发现挑战赛_赛题说明.docx",
     "exploration": "3.8.0",
@@ -9,7 +9,7 @@
     "scoring": "draft-3.11.0",
     "numerics": "1.1",
     "feedback": "1.0.0",
-    "observation_noise": "1.0.0",
+    "observation_noise": "1.1.0",
     "law_api": "1.0.0",
     "runtime": "1.1.0",
     "submission": "1.0.0"
