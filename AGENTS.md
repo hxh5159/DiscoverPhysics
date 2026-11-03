@@ -1,6 +1,6 @@
 # 本项目持续记忆与协作约定
 
-> 最后更新：2026-11-03（北京时间）
+> 最后更新：2026-11-04（北京时间）
 > 当前阶段：已实现单实例直接项目测评，按用户要求无需逐队镜像或容器模型映射；九真实环境工程端到端证据见7.90及7.92，新安装补丁交付的检查范围见7.93。构建前保存点cbb8313保留，2026-11-01公开构建授权见7.47；自动同步结果以Git核对为准。探索3.9.0、运行runtime1.4.0、外层提交1.0.0、law_api1.0.0、claims4.0.0、评分draft-3.11.0；P=80/(1+10e)，80/15/5、P≥40节约资格、100能量/20观测、单宇宙600秒保持。同分按同次九界加权节约分升序，仍同并列；噪声1.1.0、数值1.1、反馈分数内容1.0.0保持。允许合法成果复用、按成功受理时间截止、最高完整一次成绩；只反馈总分与各界总分。当前starter-v7、runtime-direct-v1-r2安装交付v3及完整模型测试r10，最新公开回归227过/4平台跳过、既有正式执行相关私有复查42过/3平台跳过、资料库36过。端到端使用脚本化本机模型服务，不代表真实权重/H200加载、模型能力或Linux进程生命周期已实测。
 > 本文件面向项目负责人和后续协作助手，用于保持需求、判断和实施状态的一致。
 
@@ -37,6 +37,8 @@
 **远端路径最新约定（2026-11-02，长期有效）：** 主项目固定为`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics`，测试资料库固定为同级`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/test`；除用户另行说明，后续所有命令使用这两个路径。模型根仍为`/inspire/hdd/project/26-the-other-shore/public/models`，镜像内`/opt/shore-*`环境位置不变。此前urbanlowaltitude下的项目/测试路径仅作历史；原Conda若仍装在旧位置，可作为现存工具使用，不表示项目仍在那里。详见7.80。
 
 **CPU安装入口最新约定（2026-11-03）：** 当前完整入口为`scripts/install_all_dependencies.sh`，版本标识2026-11-03.multiline-download-v3；直接在更新后的主项目执行亦可。六配套组件固定到2d1a5e4及SHA，包含Conda头文件定位、编译预检、镜像404及新版pip多行断连恢复；prepare_cpu_h200旧入口也同步匹配组件。已有完整工具链用--resume，首次安装省略；环境与离线资源在/opt/shore-*，不要求CPU实例有GPU、项目盘或模型盘。默认助手目录为/opt/shore-image-tools-v3，不覆盖旧v2助手，详见7.93。当前Triton断连恢复仅本次直接用官方PyPI，默认镜像偏好不变；H200执行路径及CPU联网/H200离线分工不变。
+
+**安装就绪状态补充（2026-11-04）：** 用户已实际装到Torch2.11.0+cu128并通过工具链/目录/版本检查，但torch_find_cuda预检失败。当前预检的cmake -P调用缺少CMake配置初始化已由真实CMake4.4.4与PyTorch2.11官方FindCUDA最小复现，详见7.94。本轮按用户要求先分析，尚未修改预检实现；当前不得把v3或227项测试通过表述成真实Linux完整安装已验收，远端具体stderr仍需核对。
 
 **正式赛题完整性最新复审（2026-11-03，本轮落实）：** scripts/evaluate_submission.py委托外接direct_project_eval.py，从队伍实际cwd、解释器/环境和模型配置运行；清单接受合法宿主/相对路径。直接正式模式与旧诊断区分，不伪造镜像身份；指挥部固定SDK/科学源/参考仍核验。交付说明、8页/12页文稿及direct-v1配置同步；两个实际ZIP已用修改过的队伍项目、基础agent和本机脚本化ModelClient，在九真实环境中完成36次合法实验/草稿/交卷动作、固定积分、评分及汇总复算。超时、坏提交、无稿、基础设施故障与限定反馈另经集成测试；尚无真实白名单权重/H200运行证据，不能据此宣称模型部署和能力通过，见7.90及docs/RUN_READINESS_CHECK.txt。
 
@@ -1438,6 +1440,18 @@ Python包预取不等于所有C++/CUDA第三方源码已离线：vLLM的CMake仍
 新助手固定提交2d1a5e4668e87ed5df960b9ccdc5c6b217283c8f，pip_index_install.py原始LF SHA为06019da034952e2e8e62fd79f2ff12d35fd7d168fb7a65af467e093ddfa658d7。外层换用v3助手目录，避免旧v2保护机制拒绝新SHA；其他工具链/双Python环境路径保留。本次恢复建议整套安装器直接指定官方PyPI，保留Torch/cu128等版本约束，不仅手补Triton，不关闭依赖检查或重新创建全部环境。具体激活、拉取和恢复命令已写入docs/INSTALL_RECOVERY_CUDA128.txt。用户实例能否实际连接官方源及完成编译，仍以运行日志和最终成功凭据为准。
 
 发布与交付核对：外层安装修复提交2f30ff91a7b1ad1a05a0c86e61877d5e45f49b0f，原始SHA为d047a98bf5816887dcb9325053a61f0dcb36f53aa24a6bf006e416f523d54e1e；外层与六个固定组件实际匿名下载验SHA通过。starter-v7/运行安装v3/两校准r10仍为72/110/145/146文件，36份当前与历史归档SHA及CRC通过，r9刷新保护、独立CLI与配置核验通过，资料库36项测试通过。逐文件确认科学、执行代码、profile和验证参考原字节保持；旧包和旧E2E报告保留，不宣称新包已重跑模型或科学端到端。只涉及安装恢复及配套交付，不改白名单、物理、计分、噪声或600秒约束。
+
+### 7.94 真实CMake预检暴露初始化缺陷，本轮仅分析（2026-11-04）
+
+用户新日志中cuda_layout、configured_executables、nvcc/ptxas版本、CC/CXX版本及target_python_probe均通过；目标解释器实际导入Torch2.11.0+cu128和cmake，Python3.12.16，Conda targets下三头文件与libcudart可定位。失败发生于torch_find_cuda，在nvcc_compile_only之前，因此不能称编译已通过，也不能单凭阶段名认定与旧CUDA_INCLUDE_DIRS报错相同。当前已经推进到真实CMake预检，与此前OpenAI404及Triton镜像断连是不同环节。
+
+只读源码审查确定预检使用python -m cmake ... -P find-cuda.cmake；生成脚本直接find_package(CUDA)，没有project或include(CMakeInitializeConfigs)。PyTorch2.11官方FindCUDA模块直接调用cmake_initialize_per_config_variable，脚本模式缺少相应初始化。另已核对官方cmake Python包有__main__.py，不能误诊为python -m cmake入口必然不存在。
+
+真实最小复现：官方PyPI cmake4.4.4 Windows wheel仅下载并解压到仓外分析目录，未安装进现有环境；用其中真实cmake.exe执行本项目实际生成的CMake脚本，加载下载的PyTorch v2.11.0官方FindCUDA包装与上游源码，得到Unknown CMake command "cmake_initialize_per_config_variable"，退出1。此问题在CUDA搜索之前发生；未加载GPU、编译CUDA或运行模型。证据保存在../.project-memory/cmake_preflight_analysis_20261104/；这是脚本层复现，不是远端Linux完整环境重现。
+
+验证缺口：tests/test_cuda128_build_preflight.py在CMake阶段由FakeRunner直接返回SHORE_FINDCUDA_OK，从未执行真实CMake，因而既有18项预检测试及公开227项通过不能覆盖该初始化缺陷。此前安装链修复未完成真实构建验收，只解决已暴露的下载或路径问题；不能把责任归结为用户环境，或再次盲目重装Torch。用户本轮明确先解释和分析，故不修改安装程序或重打包。
+
+远端尚需读取/opt/shore-h200-cu128/bootstrap-cu128-logs.dPmfHXa9/cuda-preflight/run-20261103T145224Z-562d22df78/torch_find_cuda.stderr.log和同目录stdout，以确认本次实际exit1是否与已复现缺陷一致；report.json本身只汇总退出码，没有具体CMake错误。后续应先修复并真实验证预检的CMake初始化/调用方式，再恢复完整安装，而不在本轮提前声称已修好。
 
 ## 8. 当前仓库的可复用部分与已确认缺口
 
