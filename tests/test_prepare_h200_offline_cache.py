@@ -108,7 +108,9 @@ def test_prepare_uses_exact_official_wheel_and_preserves_build_fields(tmp_path):
     pip = run.call_args_list[0].args[0]
     assert "flashinfer-jit-cache==0.6.12+cu128" in pip
     assert cache.OFFICIAL_JIT_LINKS in pip
-    assert "--no-deps" not in pip and "--no-cache-dir" in pip
+    assert "--no-deps" not in pip
+    assert str(cache.Path(cache.__file__).with_name("pip_index_install.py")) in pip
+    assert "--index-url" in pip and "--trusted-host" in pip
     assert "torch==2.11.0+cu128\n" in constraint_contents[0]
     assert "flashinfer-cubin==0.6.12\n" in constraint_contents[0]
     assert not list(root.glob(".flashinfer-constraints-*"))

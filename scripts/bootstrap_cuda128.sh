@@ -10,6 +10,10 @@ INDEX_URL=''
 TRUSTED_HOST=''
 PLAN=0
 CPU_BUILD_FOR=''
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+PIP_HELPER="$SCRIPT_DIR/pip_index_install.py"
+CUDA_PREFLIGHT="$SCRIPT_DIR/preflight_cuda128_build.py"
+DEPENDENCY_PREFLIGHT="$SCRIPT_DIR/prepare_vllm_dependencies.py"
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
 usage() {
     printf '%s\n' \
@@ -92,6 +96,9 @@ if [ "$PLAN" -eq 1 ]; then
 fi
 [ -n "$INDEX_URL" ] && [ -n "$TRUSTED_HOST" ] || die '--index-url and --trusted-host are required for installation.'
 [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ] || die 'This profile requires Linux x86_64.'
+for helper in "$PIP_HELPER" "$CUDA_PREFLIGHT" "$DEPENDENCY_PREFLIGHT"; do
+    [ -f "$helper" ] || die "Missing matching installer helper: $helper; use the complete install_all_dependencies.sh entry."
+done
 for executable in git curl getconf readlink; do
     command -v "$executable" >/dev/null || die "Missing build tool: $executable (install it through your platform environment)."
 done
@@ -130,6 +137,27 @@ export CUDA_HOME CC CXX
 export CUDACXX="$CUDA_HOME/bin/nvcc"
 export CUDAHOSTCXX="$CXX" NVCC_CCBIN="$CXX"
 export PATH="$CUDA_HOME/bin:$HOME/.local/bin:$PATH"
+configure_cuda128_headers() {
+    local directory include_dir='' library_dir=''
+    for directory in "$CUDA_HOME/targets/x86_64-linux/include" "$CUDA_HOME/include"; do
+        if [ -f "$directory/cuda.h" ] && [ -f "$directory/cuda_runtime.h" ] && [ -f "$directory/device_functions.h" ]; then
+            include_dir="$directory"; break
+        fi
+    done
+    [ -n "$include_dir" ] || die "CUDA 12.8 development headers are incomplete under $CUDA_HOME."
+    for directory in "$CUDA_HOME/targets/x86_64-linux/lib" "$CUDA_HOME/lib64" "$CUDA_HOME/lib"; do
+        if [ -f "$directory/libcudart.so" ]; then library_dir="$directory"; break; fi
+    done
+    [ -n "$library_dir" ] || die "CUDA 12.8 libcudart.so is missing under $CUDA_HOME."
+    case "$CUDA_HOME" in *[[:space:]]*) die 'The CUDA toolchain path must not contain whitespace for the vLLM CMAKE_ARGS interface.' ;; esac
+    export CUDA_INC_PATH="$include_dir" CUDA_LIB_PATH="$library_dir" CUDAToolkit_ROOT="$CUDA_HOME"
+    export CUDA_PATH="$CUDA_HOME" CUDA_BIN_PATH="$CUDA_HOME" CUDA_NVCC_EXECUTABLE="$CUDA_HOME/bin/nvcc"
+    export CMAKE_PREFIX_PATH="$CUDA_HOME/targets/x86_64-linux:$CUDA_HOME${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+    # Explicit cache values supplement the legacy FindCUDA environment hints.
+    export CMAKE_ARGS="${CMAKE_ARGS:-} -DCUDA_TOOLKIT_ROOT_DIR:PATH=$CUDA_HOME -DCUDA_TOOLKIT_INCLUDE:PATH=$include_dir -DCUDA_CUDART_LIBRARY:FILEPATH=$library_dir/libcudart.so"
+    printf 'CUDA development include: %s\nCUDA runtime library: %s\n' "$include_dir" "$library_dir/libcudart.so"
+}
+configure_cuda128_headers
 configure_cuda128_libraries() {
     local directory
     local -a library_dirs=() inherited_dirs=()
@@ -166,10 +194,9 @@ fi
 pip_install() {
     local interpreter="$1"
     shift
-    env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
-        "$interpreter" -m pip install "$@" \
+    "$interpreter" "$PIP_HELPER" --python "$interpreter" \
         --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" \
-        --no-cache-dir --timeout 600 --retries 5
+        --log-dir "$ENV_ROOT/pip-logs" -- "$@"
 }
 if ! command -v uv >/dev/null; then
     BOOTSTRAP_PYTHON="$(command -v python3 || command -v python)" || die 'Install Python with pip, or uv, before retrying.'
@@ -275,6 +302,11 @@ fi
 LOG_ROOT="$(mktemp -d "$ENV_ROOT/bootstrap-cu128-logs.XXXXXXXX")"
 CONSTRAINTS="$LOG_ROOT/constraints-cu128.txt"
 printf '%s\n' 'torch==2.11.0+cu128' 'torchvision==0.26.0+cu128' 'torchaudio==2.11.0+cu128' 'transformers==5.8.0' > "$CONSTRAINTS"
+printf '%s\n' 'openai>=2.0.0,<3' >> "$CONSTRAINTS"
+export FETCHCONTENT_BASE_DIR="$ENV_ROOT/.cache/vllm-fetch"
+case "$FETCHCONTENT_BASE_DIR" in *[[:space:]]*) die 'The build cache path must not contain whitespace for the vLLM CMAKE_ARGS interface.' ;; esac
+export CMAKE_ARGS="${CMAKE_ARGS:-} -DFETCHCONTENT_BASE_DIR:PATH=$FETCHCONTENT_BASE_DIR"
+mkdir -p -- "$FETCHCONTENT_BASE_DIR"
 printf '%s\n' 'Packages use your supplied index; official PyTorch/PyPI links and public GitHub build sources also require network access.'
 pip_install "$TRIAL_ENV/bin/python" 'numpy==2.1.3' 'scipy==1.15.3' 'pytest>=8,<9'
 pip_install "$MODEL_ENV/bin/python" --upgrade pip
@@ -312,8 +344,27 @@ pip_install "$MODEL_ENV/bin/python" -c "$CONSTRAINTS" \
     'cmake>=3.26.1' ninja 'packaging>=24.2' 'setuptools>=77.0.3,<81' \
     'setuptools-scm>=8' 'setuptools-rust>=1.9' wheel 'jinja2>=3.1.6' regex build \
     'protobuf>=5.29.6,!=6.30.*,!=6.31.*,!=6.32.*,!=6.33.0.*,!=6.33.1.*,!=6.33.2.*,!=6.33.3.*,!=6.33.4.*'
-pip_install "$MODEL_ENV/bin/python" -c "$CONSTRAINTS" \
-    --find-links https://pypi.org/simple/vllm/ --no-binary=vllm --no-build-isolation \
+printf '\n[SHORE] Check CUDA detection and compile a tiny object on the CPU builder (no kernel execution).\n'
+"$MODEL_ENV/bin/python" "$CUDA_PREFLIGHT" --python "$MODEL_ENV/bin/python" \
+    --cuda-home "$CUDA_HOME" --cc "$CC" --cxx "$CXX" --output "$LOG_ROOT/cuda-preflight"
+printf '\n[SHORE] Resolve and download every missing dependency before the expensive vLLM build.\n'
+DEPENDENCY_ROOT="$LOG_ROOT/dependency-preflight"
+"$MODEL_ENV/bin/python" "$DEPENDENCY_PREFLIGHT" --python "$MODEL_ENV/bin/python" \
+    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" \
+    --constraints "$CONSTRAINTS" --output "$DEPENDENCY_ROOT"
+WHEELHOUSE="$("$MODEL_ENV/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheelhouse"])' "$DEPENDENCY_ROOT/prepared.json")"
+RESOLVED_CONSTRAINTS="$("$MODEL_ENV/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["resolved_constraints"])' "$DEPENDENCY_ROOT/prepared.json")"
+RUNTIME_REQUIREMENTS="$("$MODEL_ENV/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["runtime_requirements"])' "$DEPENDENCY_ROOT/prepared.json")"
+printf '\n[SHORE] Install verified runtime dependencies before compiling vLLM.\n'
+env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
+    "$MODEL_ENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" \
+    --constraint "$CONSTRAINTS" --constraint "$RESOLVED_CONSTRAINTS" \
+    --no-build-isolation --no-cache-dir --requirement "$RUNTIME_REQUIREMENTS"
+printf '\n[SHORE] Compile and install vLLM using the verified local dependency artifacts.\n'
+env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
+    "$MODEL_ENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" \
+    --constraint "$CONSTRAINTS" --constraint "$RESOLVED_CONSTRAINTS" \
+    --no-binary=vllm --no-build-isolation --no-cache-dir \
     'vllm==0.24.0' 'transformers==5.8.0'
 "$TRIAL_ENV/bin/python" -m pip check
 "$MODEL_ENV/bin/python" -m pip check

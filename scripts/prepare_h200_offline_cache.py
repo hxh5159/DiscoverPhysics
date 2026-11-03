@@ -268,12 +268,15 @@ def prepare(root: Path, build: dict[str, Any], index: str, host: str) -> dict[st
             constraint_name = constraints.name
             for name in ("torch", "vllm", "transformers", "flashinfer-python", "flashinfer-cubin"):
                 constraints.write(f"{name}=={versions[name]}\n")
+        pip_helper = Path(__file__).with_name("pip_index_install.py")
+        if not pip_helper.is_file():
+            raise ValueError("Matching pip_index_install.py is missing; use the complete installer helpers.")
         subprocess.run([
-            str(python), "-m", "pip", "install", "--only-binary=:all:",
+            str(python), str(pip_helper), "--python", str(python),
+            "--index-url", index, "--trusted-host", host,
+            "--log-dir", str(root / "pip-logs"), "--operation", "install", "--", "--only-binary=:all:",
             "--constraint", constraint_name, f"flashinfer-jit-cache=={JIT_CACHE_VERSION}",
             "--find-links", OFFICIAL_JIT_LINKS,
-            "--index-url", index, "--trusted-host", host, "--no-cache-dir",
-            "--timeout", "600", "--retries", "5",
         ], env=env, check=True)
         subprocess.run([str(python), "-m", "pip", "check"], env=env, check=True)
     finally:
