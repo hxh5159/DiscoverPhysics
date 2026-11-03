@@ -115,6 +115,32 @@ if [ "$PLAN" -eq 1 ]; then
     exit 0
 fi
 
+configure_cuda_layout() {
+    local candidate include_dir='' library_dir=''
+    # NVIDIA Conda packages may keep development files in targets/x86_64-linux.
+    # Torch 2.11 still uses FindCUDA, which reads CUDA_INC_PATH/CUDA_LIB_PATH:
+    # https://github.com/pytorch/pytorch/blob/v2.11.0/cmake/Modules_CUDA_fix/upstream/FindCUDA.cmake
+    for candidate in "$TOOL_ROOT/targets/x86_64-linux/include" "$TOOL_ROOT/include"; do
+        if [ -f "$candidate/device_functions.h" ] && [ -f "$candidate/cuda_runtime.h" ] && \
+            [ -f "$candidate/cuda.h" ]; then
+            include_dir="$candidate"
+            break
+        fi
+    done
+    [ -n "$include_dir" ] || die "CUDA开发头文件不完整：$TOOL_ROOT 下未找到同时含device_functions.h、cuda_runtime.h、cuda.h的include目录；nvcc存在不能替代开发头文件。"
+    for candidate in "$TOOL_ROOT/targets/x86_64-linux/lib" "$TOOL_ROOT/lib64" "$TOOL_ROOT/lib"; do
+        if [ -f "$candidate/libcudart.so" ]; then
+            library_dir="$candidate"
+            break
+        fi
+    done
+    [ -n "$library_dir" ] || die "CUDA开发库不完整：$TOOL_ROOT 下未找到libcudart.so；请核对CUDA12.8开发包，不能使用驱动stub冒充运行库。"
+    export CUDA_INC_PATH="$include_dir" CUDA_LIB_PATH="$library_dir"
+    export CUDAToolkit_ROOT="$TOOL_ROOT"
+    export CMAKE_PREFIX_PATH="$TOOL_ROOT/targets/x86_64-linux:$TOOL_ROOT${CMAKE_PREFIX_PATH:+:$CMAKE_PREFIX_PATH}"
+    printf 'CUDA开发头文件：%s\nCUDA运行库：%s\n' "$include_dir" "$library_dir"
+}
+
 verify_all() {
     local program
     for program in nvcc ptxas x86_64-conda-linux-gnu-gcc x86_64-conda-linux-gnu-g++ uv git curl; do
@@ -124,6 +150,7 @@ verify_all() {
     "$TOOL_ROOT/bin/ptxas" --version | grep -Eq 'release 12\.8([,[:space:]]|$)' || die 'ptxas版本不是CUDA12.8。'
     "$TOOL_ROOT/bin/x86_64-conda-linux-gnu-gcc" -dumpversion | grep -Eq '^12([.]|$)' || die 'GCC版本不是12。'
     "$TOOL_ROOT/bin/x86_64-conda-linux-gnu-g++" -dumpversion | grep -Eq '^12([.]|$)' || die 'G++版本不是12。'
+    configure_cuda_layout
     [ -x "$TRIAL_PY" ] || die "实验环境不存在或不可执行：$TRIAL_PY"
     [ -x "$MODEL_PY" ] || die "推理环境不存在或不可执行：$MODEL_PY"
     [ -f "$ENV_ROOT/activate_h200_offline.sh" ] || die '缺少H200离线激活文件。'
@@ -267,6 +294,7 @@ export GIT_TERMINAL_PROMPT=0
 "$TOOL_ROOT/bin/ptxas" --version
 "$CC" --version
 "$CXX" --version
+configure_cuda_layout
 command -v sha256sum >/dev/null || die '缺少系统基础命令sha256sum。'
 
 stage '3/7 自动准备固定版本安装组件并校验SHA256'
