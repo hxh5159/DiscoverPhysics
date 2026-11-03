@@ -1467,6 +1467,8 @@ preflight补include(CMakeInitializeConfigs)，失败JSON带最多4096字符的�
 
 当前安装入口固定提交45dab58e3090ae3e95387dd3bb0ebd4bad379c56，原字节SHA为4fe5795004d8b9b24e0157a0f77af6f39d3746a1e43d445a6f03e0cd7767ec92；外层及七个组件实际匿名下载验SHA全部通过。本轮分发只变安装相关payload及元数据，124项科学/SDK/profile/参考/PDF保护检查通过。当前starter-v8/运行安装v4/两校准r11为73/111/146/147文件，40份归档CRC/SHA及四类旧包实际刷新保护通过；已有.part、下载回执、环境、日志、结果保持。资料库36项回归通过；没有重新执行真实模型或科学端到端，不将旧报告直接归给新包。
 
+后续校验命令更正：助手一条最终回复误把上述64位摘要抄成68位，导致用户下载21602字节脚本后sha256sum提示no properly formatted checksum lines found；此时安装器尚未执行，不是新一轮构建失败。已重新从固定Git原始字节计算摘要，并用真实Git Bash执行printf|sha256sum -c通过。修正命令可在同一终端复用已有SHORE_INSTALLER文件，无需再次下载；仓库脚本与本节原摘要一直正确，后续须从工具结果直接引用并核对长度。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
