@@ -26,14 +26,18 @@ uv若已有会复用；没有时按指定pip索引安装。Python3.12由uv创建
 若使用独立编译器，可设置CC/CXX为相应GCC/G++可执行文件的绝对路径。
 
 二、安装
-先下载或从项目取出 scripts/bootstrap_cuda128.sh，再运行：
+在完整开发包根目录运行，保留scripts下匹配的安装组件；不能只复制bootstrap脚本：
 
-bash bootstrap_cuda128.sh \
+bash scripts/bootstrap_cuda128.sh \
   --env-root '/已有父目录下的环境目录' \
   --index-url '<用户指定的PyPI索引URL>' \
   --trusted-host '<该索引主机名>'
 
 参数--env-root不要求包含项目或私有包，可与已有测试包共用目录。
+配套组件为pip_index_install.py、preflight_cuda128_build.py、prepare_vllm_dependencies.py；
+安装前检查Torch FindCUDA与小型CUDA对象编译，之后预下载并核验缺失Python依赖。
+指定镜像下载404或连接失败时，仅单次切换官方PyPI重新解析，不混合索引；
+实际源码构建仍可能下载公开C++/CUDA第三方源码，不属于pip离线档案范围。
 只创建/复用.venv-trial和.venv-vllm-cu128，不删除旧.venv-vllm、日志、结果或缓存。
 目标父目录必须存在；非环境文件、未完成环境及用户自写的激活脚本会被保护并明确报错。
 默认uv管理的Python也保存在环境目录下的.tools/python，避免解释器只留在实例临时层。

@@ -24,6 +24,7 @@ PUBLIC_FILES = (
     "scripts/serve_model.py", "scripts/build_runtime_images.py", "scripts/make_submission.py",
     "scripts/evaluate_submission.py",
     "scripts/bootstrap_cuda128.sh", "scripts/prepare_h200_offline_cache.py",
+    "scripts/pip_index_install.py", "scripts/prepare_vllm_dependencies.py", "scripts/preflight_cuda128_build.py",
     "scripts/verify_h200_cuda128.py", "requirements.txt",
     "docs/LAW_API.txt", "docs/CONSOLE_API.txt", "docs/SUBMISSION_API.txt", "docs/CONTEST_WORKFLOW.txt",
     "docs/QUICKSTART.txt", "docs/PARTICIPANT_FILES.txt", "docs/MODEL_RUNTIME.txt", "docs/MODELS.txt",

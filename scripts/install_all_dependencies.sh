@@ -9,16 +9,18 @@ umask 077
 
 ENV_ROOT='/opt/shore-h200-cu128'
 TOOL_ROOT='/opt/shore-h200-toolchain'
-SCRIPT_ROOT='/opt/shore-image-tools'
+SCRIPT_ROOT='/opt/shore-image-tools-v2'
 INDEX_URL="${SHORE_PIP_MIRROR:-}"
 TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 CONDA_BIN="${CONDA_EXE:-}"
 JOBS="${SHORE_BUILD_JOBS:-2}"
 PLAN=0
 CHECK_ONLY=0
+RESUME=0
+INSTALLER_VERSION='2026-11-03.download-preflight-v2'
 PHASE='参数检查'
 LOG_FILE=''
-SOURCE_REF='31b9e13bfb55455d0fc99f6fbcfcbe99ea075871'
+SOURCE_REF='20a87a71128be6e7ce577133f825b31149884ca8'
 
 die() { printf 'ERROR [%s]: %s\n' "$PHASE" "$*" >&2; exit 2; }
 stage() { PHASE="$1"; printf '\n========== %s ==========\n' "$PHASE"; }
@@ -41,11 +43,12 @@ Usage:
 Options:
   --env-root PATH     Python environments/cache root (default /opt/shore-h200-cu128)
   --tool-root PATH    Conda CUDA/compiler toolchain (default /opt/shore-h200-toolchain)
-  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools)
+  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v2)
   --conda-exe PATH    Existing Conda executable; otherwise discover CONDA_EXE/PATH
   --jobs NUMBER       CPU build jobs (default SHORE_BUILD_JOBS or 2)
   --plan              Print the complete installation plan; no filesystem/network changes
   --check             Check installed packages/cache locally; no installation or GPU calls
+  --resume            Reuse the existing CUDA12.8/GCC12 toolchain instead of resolving Conda again
 
 The index may also be supplied by SHORE_PIP_MIRROR/SHORE_PIP_MIRROR_HOST.
 Installs Python3.12, NumPy2.1.3, SciPy1.15.3, pytest, CUDA Toolkit12.8.1,
@@ -77,6 +80,7 @@ while [ "$#" -gt 0 ]; do
             shift 2 ;;
         --plan) PLAN=1; shift ;;
         --check) CHECK_ONLY=1; shift ;;
+        --resume) RESUME=1; shift ;;
         --help|-h) usage; exit 0 ;;
         *) die "未知选项：$1；使用--help查看用法。" ;;
     esac
@@ -107,6 +111,7 @@ if [ "$PLAN" -eq 1 ]; then
         '3. 检查或安装uv，创建实验和推理两套Python3.12环境。' \
         '4. 安装NumPy/SciPy/pytest以及PyTorch2.11+cu128。' \
         '5. 安装构建依赖，从源码编译vLLM0.24，安装Transformers5.8及其依赖。' \
+        '   编译前真实检查CUDA、预下载并校验全部缺失依赖；镜像下载失败时单次官方源回退。' \
         '6. 下载并校验FlashInfer0.6.12/cu128离线推理资源。' \
         '7. 检查两环境版本、pip依赖、CPU计算、构建清单和离线文件完整性。' \
         "实验Python：$TRIAL_PY" "推理Python：$MODEL_PY" \
@@ -155,7 +160,7 @@ verify_all() {
     [ -x "$MODEL_PY" ] || die "推理环境不存在或不可执行：$MODEL_PY"
     [ -f "$ENV_ROOT/activate_h200_offline.sh" ] || die '缺少H200离线激活文件。'
     [ -f "$SCRIPT_ROOT/prepare_h200_offline_cache.py" ] || die '缺少离线资源校验脚本。'
-    printf '%s  %s\n' 925e21a9cef1ec297f03c5136ff6020078fd59d8a2765fa69e3e54cfd0cade7a \
+    printf '%s  %s\n' 86989fe2f96c40284280c4d3d8e094dadafccf6646082617d65d41f1a9d449f1 \
         "$SCRIPT_ROOT/prepare_h200_offline_cache.py" | sha256sum -c -
     # Preserve the CUDA12.8/compiler runtime libraries; never use Toolkit stubs.
     local directory inherited
@@ -263,7 +268,7 @@ mkdir -p -- "$ENV_ROOT" "$SCRIPT_ROOT"
 command -v tee >/dev/null || die '缺少系统基础命令tee。'
 LOG_FILE="$(mktemp "$ENV_ROOT/install-all-dependencies.XXXXXXXX.log")"
 exec > >(tee -a "$LOG_FILE") 2>&1
-printf '完整安装日志：%s\n实验环境：%s\n推理环境：%s\n' "$LOG_FILE" "$TRIAL_PY" "$MODEL_PY"
+printf '安装器版本：%s\n完整安装日志：%s\n实验环境：%s\n推理环境：%s\n' "$INSTALLER_VERSION" "$LOG_FILE" "$TRIAL_PY" "$MODEL_PY"
 # Prevent two installer processes from changing the same environments concurrently.
 if command -v flock >/dev/null; then
     exec 9> "$ENV_ROOT/install-all-dependencies.lock"
@@ -276,11 +281,21 @@ CONDA_ARGS=()
 if [ "$CONDA_ACTION" = create ]; then CONDA_ARGS+=(--no-default-packages); fi
 unset PYTHONHOME PYTHONPATH
 export PYTHONNOUSERSITE=1 CUDA_VISIBLE_DEVICES=''
-CONDA_SUBDIR=linux-64 CONDA_OVERRIDE_CUDA=12.8 "$CONDA_BIN" "$CONDA_ACTION" -y --prefix "$TOOL_ROOT" "${CONDA_ARGS[@]}" \
-    --override-channels --channel https://conda.anaconda.org/nvidia/label/cuda-12.8.1 \
-    --channel https://conda.anaconda.org/conda-forge \
-    'cuda-toolkit=12.8.1' 'gcc_linux-64=12' 'gxx_linux-64=12' \
-    'python=3.12' pip uv git curl make pkg-config
+if [ "$RESUME" -eq 1 ]; then
+    [ -f "$TOOL_ROOT/conda-meta/history" ] || die '--resume要求已有完整Conda工具链；首次安装请省略此选项。'
+    for program in nvcc ptxas x86_64-conda-linux-gnu-gcc x86_64-conda-linux-gnu-g++ python uv git curl; do
+        [ -x "$TOOL_ROOT/bin/$program" ] || die "--resume发现工具缺失：$TOOL_ROOT/bin/$program；省略--resume可补齐。"
+    done
+    "$TOOL_ROOT/bin/nvcc" --version | grep -Eq 'release 12\.8([,[:space:]]|$)' || die '--resume工具链CUDA版本不是12.8。'
+    "$TOOL_ROOT/bin/x86_64-conda-linux-gnu-g++" -dumpversion | grep -Eq '^12([.]|$)' || die '--resume需要已有G++12。'
+    printf '%s\n' '复用已有工具链，跳过Conda求解；后续仍检查头文件、编译、依赖和离线资源。'
+else
+    CONDA_SUBDIR=linux-64 CONDA_OVERRIDE_CUDA=12.8 "$CONDA_BIN" "$CONDA_ACTION" -y --prefix "$TOOL_ROOT" "${CONDA_ARGS[@]}" \
+        --override-channels --channel https://conda.anaconda.org/nvidia/label/cuda-12.8.1 \
+        --channel https://conda.anaconda.org/conda-forge \
+        'cuda-toolkit=12.8.1' 'gcc_linux-64=12' 'gxx_linux-64=12' \
+        'python=3.12' pip uv git curl make pkg-config
+fi
 export SHORE_CUDA128_HOME="$TOOL_ROOT"
 export CC="$TOOL_ROOT/bin/x86_64-conda-linux-gnu-gcc"
 export CXX="$TOOL_ROOT/bin/x86_64-conda-linux-gnu-g++"
@@ -321,9 +336,12 @@ fetch_helper() {
     fi
     mv -- "$temporary" "$target"
 }
-fetch_helper bootstrap_cuda128.sh 0da6d45886f6e67e3247b49bbc8977ac00a91c997cfece4d9551f42cafc78443
-fetch_helper prepare_h200_offline_cache.py 925e21a9cef1ec297f03c5136ff6020078fd59d8a2765fa69e3e54cfd0cade7a
+fetch_helper bootstrap_cuda128.sh 4fd9f6ecc308ea6a2691f4632ee46f423d8c81be4c5b856d435773f185f6c4de
+fetch_helper prepare_h200_offline_cache.py 86989fe2f96c40284280c4d3d8e094dadafccf6646082617d65d41f1a9d449f1
 fetch_helper verify_h200_cuda128.py 5a1ebc8e5fbe1fc726701a8748f53e665ee05854befadccf334cad2ebae1ffc8
+fetch_helper pip_index_install.py e4c8685ea07678629d443262321139e909bdb06fe46aa4d31c6cc25cde060c7e
+fetch_helper preflight_cuda128_build.py 19d0997e04cb414e1bb46e4fc9ff9ed1da822fcfd7ed873e9176f4f0bd0691f4
+fetch_helper prepare_vllm_dependencies.py 75b99561007ef14ef37fefb7bc13c405764725e9657a694717a015c070d21372
 
 stage '4/7 安装uv/Python3.12、NumPy/SciPy、PyTorch和vLLM/Transformers'
 printf '%s\n' '此阶段会真实执行pip安装及vLLM源码编译；首次安装可能耗时较长，输出持续写入日志。'
@@ -339,7 +357,7 @@ stage '6/7 检查两套环境版本、pip依赖和离线文件'
 verify_all
 
 stage '7/7 写入本次成功凭据'
-"$TRIAL_PY" - "$ENV_ROOT" "$MODEL_PY" "$TOOL_ROOT" "$SCRIPT_ROOT" "$LOG_FILE" "$SOURCE_REF" <<'PY'
+"$TRIAL_PY" - "$ENV_ROOT" "$MODEL_PY" "$TOOL_ROOT" "$SCRIPT_ROOT" "$LOG_FILE" "$SOURCE_REF" "$INSTALLER_VERSION" <<'PY'
 import importlib.metadata as md
 import json
 from datetime import datetime, timezone
@@ -347,7 +365,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-root, model_python, tool_root, script_root, log_file, revision = sys.argv[1:]
+root, model_python, tool_root, script_root, log_file, revision, installer_version = sys.argv[1:]
 code = 'import importlib.metadata as m,json;print(json.dumps({n:m.version(n) for n in ("torch","vllm","transformers","flashinfer-python","flashinfer-jit-cache")}))'
 model = json.loads(subprocess.check_output([model_python, '-c', code], text=True))
 receipt = {
@@ -358,6 +376,7 @@ receipt = {
     'trial_versions': {n: md.version(n) for n in ('numpy', 'scipy', 'pytest')},
     'model_versions': model, 'tool_root': tool_root, 'script_root': script_root,
     'helper_source_revision': revision, 'log': log_file,
+    'installer_version': installer_version,
     'gpu_or_model_execution_performed': False,
 }
 path = Path(root) / 'install-all-dependencies-success.json'

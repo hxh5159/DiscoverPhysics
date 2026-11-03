@@ -1,0 +1,44 @@
+CUDA12.8/H200完整安装与恢复（2026-11-03）
+
+在可联网CPU实例中运行完整install_all_dependencies.sh；无需GPU、项目盘或模型权重。
+已有工具链且上次停在pip/vLLM阶段时加--resume，跳过Conda重新求解，保留已有环境。
+首次安装省略--resume。镜像/实例保存复制由使用者自行负责，不属于安装或测评协议。
+
+安装器版本标识：2026-11-03.download-preflight-v2。
+默认辅助脚本目录改为/opt/shore-image-tools-v2，保留旧/opt/shore-image-tools。
+Python环境和CUDA工具链仍是/opt/shore-h200-cu128及/opt/shore-h200-toolchain。
+
+从当前项目运行：
+  bash scripts/install_all_dependencies.sh --resume \
+    --index-url "$SHORE_PIP_MIRROR" --trusted-host "$SHORE_PIP_MIRROR_HOST"
+
+SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST使用平台提供的内网pip地址。
+也可下载此脚本的已发布固定版本后执行；脚本内部按固定Git提交和SHA获取匹配组件，
+不需要为了安装环境先克隆项目。不要继续使用之前固定旧提交的下载链接。
+
+完整安装顺序：
+1. 检查或复用CUDA12.8/GCC12工具链，确认真实头文件、运行库、编译器来自同一工具链。
+2. 安装/检查独立Python3.12实验环境、Torch2.11+cu128及构建工具。
+3. 用目标环境的Torch FindCUDA检测头文件和库，nvcc只编译一个SM90对象文件，不运行GPU。
+4. 按核心版本约束解析vLLM/Transformers全部缺失依赖，实际下载每个选中档案并验SHA。
+   此步骤保留已经满足要求的包，不为预检重复下载已装的巨型Torch。
+5. 安装已验证的运行依赖，再从本地档案编译vLLM；源码第三方下载保留在持久FetchContent目录。
+6. 安装FlashInfer0.6.12/cu128配套资源，下载官方cubin并校验完整清单。
+7. 两环境pip check、固定主版本、编译扩展摘要、离线资源全部通过后才写成功凭据。
+
+下载处理：优先平台镜像，只有明确镜像包下载404/网络失败才单次切换官方PyPI；
+不混合extra-index，不放开Torch/CUDA约束，不将编译失败或版本冲突伪装成镜像问题。
+依赖预取如果遇到坏直链，会从官方重新解析新URL，不反复请求同一失效地址。
+OpenAI包只是vLLM的协议依赖，不会因此调用外部模型或使用API key；约束在2.x族用于
+限制无界主版本漂移，并非已经证明3.x必然不兼容。
+
+诊断保留：
+  /opt/shore-h200-cu128/install-all-dependencies.*.log
+  /opt/shore-h200-cu128/pip-logs/
+  /opt/shore-h200-cu128/bootstrap-cu128-logs.*/cuda-preflight/
+  /opt/shore-h200-cu128/bootstrap-cu128-logs.*/dependency-preflight/
+  /opt/shore-h200-cu128/install-all-dependencies-success.json
+
+出现“全部基础应用依赖及离线资源安装完成”且成功凭据为本次生成，才算CPU安装完成。
+随后可用同一脚本--check复核。GPU初始化、真实白名单模型加载和多卡生成须在实际
+H200实例验证；CPU编译和离线缓存检查不等于真实模型已运行。

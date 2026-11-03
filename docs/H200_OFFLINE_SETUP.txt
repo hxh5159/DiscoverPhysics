@@ -8,7 +8,7 @@ H200实例只做本地验收和推理，不执行pip/conda/git或联网下载。
 环境与编译工具建议放在镜像会保存的/opt目录，示例：
   /opt/shore-h200-cu128         双Python环境、Python解释器、缓存及构建清单
   /opt/shore-h200-toolchain     CUDA12.8、GCC/G++12、git、curl、make
-  /opt/shore-image-tools       三份准备/检查脚本
+  /opt/shore-image-tools-v2    六份匹配的安装/准备/检查组件
 在平台保存镜像前确认这些路径属于会打包的文件系统。
 /inspire/...共享盘的项目与模型在H200实例中另行挂载；不能默认挂载盘会随镜像复制。
 镜像部署后保持相同绝对路径，不仅复制venv目录。
@@ -16,6 +16,8 @@ H200实例只做本地验收和推理，不执行pip/conda/git或联网下载。
 二、CPU实例：编译
 准备完整CUDA Toolkit12.8与GCC/G++11.3—14，无须安装GPU驱动。
 使用bootstrap_cuda128.sh的显式CPU构建模式：
+脚本所在目录还须包含pip_index_install.py、preflight_cuda128_build.py、
+prepare_vllm_dependencies.py，须从同一完整版本取得，不混用旧组件。
 
 export SHORE_CUDA128_HOME=/opt/shore-h200-toolchain
 export CC=/opt/shore-h200-toolchain/bin/x86_64-conda-linux-gnu-gcc
@@ -23,7 +25,7 @@ export CXX=/opt/shore-h200-toolchain/bin/x86_64-conda-linux-gnu-g++
 export PATH="$SHORE_CUDA128_HOME/bin:$HOME/.local/bin:$PATH"
 export SHORE_BUILD_JOBS=2
 
-bash /opt/shore-image-tools/bootstrap_cuda128.sh \
+bash /opt/shore-image-tools-v2/bootstrap_cuda128.sh \
   --cpu-build-for h200 --env-root /opt/shore-h200-cu128 \
   --index-url '<用户指定的PyPI索引URL>' --trusted-host '<对应主机名>'
 
@@ -37,11 +39,11 @@ bash /opt/shore-image-tools/bootstrap_cuda128.sh \
 三、CPU实例：下载离线内核
 安装完成后执行：
 
-python3 /opt/shore-image-tools/prepare_h200_offline_cache.py \
+python3 /opt/shore-image-tools-v2/prepare_h200_offline_cache.py \
   --env-root /opt/shore-h200-cu128 \
   --index-url '<用户指定的PyPI索引URL>' --trusted-host '<对应主机名>'
 
-python3 /opt/shore-image-tools/prepare_h200_offline_cache.py \
+python3 /opt/shore-image-tools-v2/prepare_h200_offline_cache.py \
   --env-root /opt/shore-h200-cu128 --verify
 
 工具按官方cu128索引安装flashinfer-jit-cache0.6.12+cu128，下载同版cubin，
@@ -59,7 +61,7 @@ Toolkit的stub库可用于链接，不得加入运行LD_LIBRARY_PATH；真实驱
 先确认平台已分配四张完整H200并挂载项目/模型共享盘，再执行：
 
 source /opt/shore-h200-cu128/activate_h200_offline.sh
-python3 /opt/shore-image-tools/verify_h200_cuda128.py \
+python3 /opt/shore-image-tools-v2/verify_h200_cuda128.py \
   --env-root /opt/shore-h200-cu128
 
 激活文件固定本地缓存，开启HF离线与FlashInfer禁止下载；保留本地JIT能力。
