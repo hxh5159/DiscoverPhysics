@@ -13,7 +13,7 @@ TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 PLAN=0
 DEPENDENCIES_ONLY=0
 # These independent environment helpers share a fixed, previously published revision.
-DEPENDENCY_SOURCE_REF='2d1a5e4668e87ed5df960b9ccdc5c6b217283c8f'
+DEPENDENCY_SOURCE_REF='66950e93eed55241469fc30587f45a24ad86fea1'
 PHASE='解析参数'
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
@@ -166,7 +166,7 @@ if command -v uv >/dev/null; then uv --version; fi
 
 if [ "$DEPENDENCIES_ONLY" -eq 1 ]; then
     stage '3/7 获取独立环境安装与检查脚本'
-    for name in bootstrap_cuda128.sh prepare_h200_offline_cache.py verify_h200_cuda128.py pip_index_install.py prepare_vllm_dependencies.py preflight_cuda128_build.py; do
+    for name in bootstrap_cuda128.sh prepare_h200_offline_cache.py verify_h200_cuda128.py pip_index_install.py prepare_vllm_dependencies.py preflight_cuda128_build.py prepare_torch_wheel.py; do
         temporary="$(mktemp "$SCRIPTS/.${name}.download.XXXXXXXX")"
         curl -fL --retry 3 --connect-timeout 30 \
             "https://raw.githubusercontent.com/hxh5159/DiscoverPhysics/$DEPENDENCY_SOURCE_REF/scripts/$name" \
@@ -208,7 +208,7 @@ else
     python3 "$ASSETS/prepare_test_bundle.py" --bundle h200 --target "$TESTROOT"
 fi
 
-for name in bootstrap_cuda128.sh prepare_h200_offline_cache.py verify_h200_cuda128.py pip_index_install.py prepare_vllm_dependencies.py preflight_cuda128_build.py; do
+for name in bootstrap_cuda128.sh prepare_h200_offline_cache.py verify_h200_cuda128.py pip_index_install.py prepare_vllm_dependencies.py preflight_cuda128_build.py prepare_torch_wheel.py; do
     [ -f "$PROJECT/scripts/$name" ] || die "主仓库缺少准备脚本：scripts/$name"
     cp -- "$PROJECT/scripts/$name" "$SCRIPTS/"
 done

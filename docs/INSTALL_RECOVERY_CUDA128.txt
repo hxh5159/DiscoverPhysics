@@ -1,12 +1,21 @@
-CUDA12.8/H200完整安装与恢复（2026-11-03）
+CUDA12.8/H200完整安装与恢复（2026-11-04）
 
 在可联网CPU实例中运行完整install_all_dependencies.sh；无需GPU、项目盘或模型权重。
 已有工具链且上次停在pip/vLLM阶段时加--resume，跳过Conda重新求解，保留已有环境。
 首次安装省略--resume。镜像/实例保存复制由使用者自行负责，不属于安装或测评协议。
 
-安装器版本标识：2026-11-03.multiline-download-v3。
-默认辅助脚本目录为/opt/shore-image-tools-v3，保留旧v2与/opt/shore-image-tools。
+安装器版本标识：2026-11-04.persistent-torch-cmake-v4。
+默认辅助脚本目录为/opt/shore-image-tools-v4，保留旧v2/v3与/opt/shore-image-tools。
 Python环境和CUDA工具链仍是/opt/shore-h200-cu128及/opt/shore-h200-toolchain。
+
+当前恢复重点：目标解释器报No module named torch，说明当前环境尚无可导入Torch。
+已有成功导入记录不能替代当前实例的实际结果，实例/环境是否变化需按日志核对。
+v4在Torch未安装时先用curl持久化下载固定wheel到环境根wheelhouse，使用.part跨次续传；
+只有文件大小与官方SHA均通过才改为.whl并交给pip。精确版本已安装时不再请求大wheel。
+这能避免后续重跑从零下载，不能保证当前实例的外网带宽变快；旧pip临时79MB不自动迁移。
+应先停止旧安装进程再启动新安装器，避免并发修改同一环境。
+原Torch FindCUDA预检补齐CMakeInitializeConfigs初始化，并有真实CMake回归；
+该回归验证CMake脚本，不等于真实Linux CUDA编译、vLLM或模型推理已通过。
 
 从当前项目运行：
   bash scripts/install_all_dependencies.sh --resume \
@@ -38,7 +47,7 @@ https://pypi.org/simple、trusted-host改成pypi.org；Torch/cu128等版本约�
 完整安装顺序：
 1. 检查或复用CUDA12.8/GCC12工具链，确认真实头文件、运行库、编译器来自同一工具链。
 2. 安装/检查独立Python3.12实验环境、Torch2.11+cu128及构建工具。
-3. 用目标环境的Torch FindCUDA检测头文件和库，nvcc只编译一个SM90对象文件，不运行GPU。
+3. 用目标环境的Torch FindCUDA检测头文件和库，先加载CMake配置初始化；nvcc只编译一个SM90对象文件，不运行GPU。
 4. 按核心版本约束解析vLLM/Transformers全部缺失依赖，实际下载每个选中档案并验SHA。
    此步骤保留已经满足要求的包，不为预检重复下载已装的巨型Torch。
 5. 安装已验证的运行依赖，再从本地档案编译vLLM；源码第三方下载保留在持久FetchContent目录。
@@ -54,6 +63,7 @@ OpenAI包只是vLLM的协议依赖，不会因此调用外部模型或使用API 
 诊断保留：
   /opt/shore-h200-cu128/install-all-dependencies.*.log
   /opt/shore-h200-cu128/pip-logs/
+  /opt/shore-h200-cu128/wheelhouse/
   /opt/shore-h200-cu128/bootstrap-cu128-logs.*/cuda-preflight/
   /opt/shore-h200-cu128/bootstrap-cu128-logs.*/dependency-preflight/
   /opt/shore-h200-cu128/install-all-dependencies-success.json

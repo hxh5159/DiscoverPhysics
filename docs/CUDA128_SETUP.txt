@@ -35,6 +35,7 @@ bash scripts/bootstrap_cuda128.sh \
 
 参数--env-root不要求包含项目或私有包，可与已有测试包共用目录。
 配套组件为pip_index_install.py、preflight_cuda128_build.py、prepare_vllm_dependencies.py；
+另须配齐prepare_torch_wheel.py，缺失Torch时先持久化续传精确wheel并核对官方SHA。
 安装前检查Torch FindCUDA与小型CUDA对象编译，之后预下载并核验缺失Python依赖。
 指定镜像下载404或连接失败时，仅单次切换官方PyPI重新解析，不混合索引；
 实际源码构建仍可能下载公开C++/CUDA第三方源码，不属于pip离线档案范围。

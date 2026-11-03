@@ -9,7 +9,7 @@ umask 077
 
 ENV_ROOT='/opt/shore-h200-cu128'
 TOOL_ROOT='/opt/shore-h200-toolchain'
-SCRIPT_ROOT='/opt/shore-image-tools-v3'
+SCRIPT_ROOT='/opt/shore-image-tools-v4'
 INDEX_URL="${SHORE_PIP_MIRROR:-}"
 TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 CONDA_BIN="${CONDA_EXE:-}"
@@ -17,10 +17,10 @@ JOBS="${SHORE_BUILD_JOBS:-2}"
 PLAN=0
 CHECK_ONLY=0
 RESUME=0
-INSTALLER_VERSION='2026-11-03.multiline-download-v3'
+INSTALLER_VERSION='2026-11-04.persistent-torch-cmake-v4'
 PHASE='参数检查'
 LOG_FILE=''
-SOURCE_REF='2d1a5e4668e87ed5df960b9ccdc5c6b217283c8f'
+SOURCE_REF='66950e93eed55241469fc30587f45a24ad86fea1'
 
 die() { printf 'ERROR [%s]: %s\n' "$PHASE" "$*" >&2; exit 2; }
 stage() { PHASE="$1"; printf '\n========== %s ==========\n' "$PHASE"; }
@@ -43,7 +43,7 @@ Usage:
 Options:
   --env-root PATH     Python environments/cache root (default /opt/shore-h200-cu128)
   --tool-root PATH    Conda CUDA/compiler toolchain (default /opt/shore-h200-toolchain)
-  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v3)
+  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v4)
   --conda-exe PATH    Existing Conda executable; otherwise discover CONDA_EXE/PATH
   --jobs NUMBER       CPU build jobs (default SHORE_BUILD_JOBS or 2)
   --plan              Print the complete installation plan; no filesystem/network changes
@@ -336,12 +336,13 @@ fetch_helper() {
     fi
     mv -- "$temporary" "$target"
 }
-fetch_helper bootstrap_cuda128.sh 4fd9f6ecc308ea6a2691f4632ee46f423d8c81be4c5b856d435773f185f6c4de
+fetch_helper bootstrap_cuda128.sh 79f550a133418e50998fc92f462aee655a55b5e05e3aca3b40f90de2c88fdabc
 fetch_helper prepare_h200_offline_cache.py 86989fe2f96c40284280c4d3d8e094dadafccf6646082617d65d41f1a9d449f1
 fetch_helper verify_h200_cuda128.py 5a1ebc8e5fbe1fc726701a8748f53e665ee05854befadccf334cad2ebae1ffc8
 fetch_helper pip_index_install.py 06019da034952e2e8e62fd79f2ff12d35fd7d168fb7a65af467e093ddfa658d7
-fetch_helper preflight_cuda128_build.py 19d0997e04cb414e1bb46e4fc9ff9ed1da822fcfd7ed873e9176f4f0bd0691f4
+fetch_helper preflight_cuda128_build.py 4d2855ff709a3d57b8cc5f12993c5b38d6b256cc16222a245caa91c8dfdd45b0
 fetch_helper prepare_vllm_dependencies.py 75b99561007ef14ef37fefb7bc13c405764725e9657a694717a015c070d21372
+fetch_helper prepare_torch_wheel.py c76933e29f01461295397c79166638451b40c341a82c1a74ba9b2441bd3ec954
 
 stage '4/7 安装uv/Python3.12、NumPy/SciPy、PyTorch和vLLM/Transformers'
 printf '%s\n' '此阶段会真实执行pip安装及vLLM源码编译；首次安装可能耗时较长，输出持续写入日志。'

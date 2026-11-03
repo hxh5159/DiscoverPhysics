@@ -38,7 +38,7 @@
 
 **CPU安装入口最新约定（2026-11-03）：** 当前完整入口为`scripts/install_all_dependencies.sh`，版本标识2026-11-03.multiline-download-v3；直接在更新后的主项目执行亦可。六配套组件固定到2d1a5e4及SHA，包含Conda头文件定位、编译预检、镜像404及新版pip多行断连恢复；prepare_cpu_h200旧入口也同步匹配组件。已有完整工具链用--resume，首次安装省略；环境与离线资源在/opt/shore-*，不要求CPU实例有GPU、项目盘或模型盘。默认助手目录为/opt/shore-image-tools-v3，不覆盖旧v2助手，详见7.93。当前Triton断连恢复仅本次直接用官方PyPI，默认镜像偏好不变；H200执行路径及CPU联网/H200离线分工不变。
 
-**安装就绪状态补充（2026-11-04）：** 用户已实际装到Torch2.11.0+cu128并通过工具链/目录/版本检查，但torch_find_cuda预检失败。当前预检的cmake -P调用缺少CMake配置初始化已由真实CMake4.4.4与PyTorch2.11官方FindCUDA最小复现，详见7.94。本轮按用户要求先分析，尚未修改预检实现；当前不得把v3或227项测试通过表述成真实Linux完整安装已验收，远端具体stderr仍需核对。
+**安装就绪状态补充（2026-11-04）：** 用户最新在固定模型解释器实际得到No module named torch，当前环境尚无可导入Torch，必须以当前结果优先，不再以早先成功target_probe推断本实例已装好。CMake脚本初始化缺陷现已修复并用真实CMake验证；新增持久Torch下载器，完整安装器v4自动调用。已通过243项公开回归/4平台跳过，但仍没有真实远端完整CUDA/vLLM构建、H200或模型加载成功证据；下载器不能保证远端带宽变快，也不接管旧pip临时79MB，详见7.95。
 
 **正式赛题完整性最新复审（2026-11-03，本轮落实）：** scripts/evaluate_submission.py委托外接direct_project_eval.py，从队伍实际cwd、解释器/环境和模型配置运行；清单接受合法宿主/相对路径。直接正式模式与旧诊断区分，不伪造镜像身份；指挥部固定SDK/科学源/参考仍核验。交付说明、8页/12页文稿及direct-v1配置同步；两个实际ZIP已用修改过的队伍项目、基础agent和本机脚本化ModelClient，在九真实环境中完成36次合法实验/草稿/交卷动作、固定积分、评分及汇总复算。超时、坏提交、无稿、基础设施故障与限定反馈另经集成测试；尚无真实白名单权重/H200运行证据，不能据此宣称模型部署和能力通过，见7.90及docs/RUN_READINESS_CHECK.txt。
 
@@ -1452,6 +1452,18 @@ Python包预取不等于所有C++/CUDA第三方源码已离线：vLLM的CMake仍
 验证缺口：tests/test_cuda128_build_preflight.py在CMake阶段由FakeRunner直接返回SHORE_FINDCUDA_OK，从未执行真实CMake，因而既有18项预检测试及公开227项通过不能覆盖该初始化缺陷。此前安装链修复未完成真实构建验收，只解决已暴露的下载或路径问题；不能把责任归结为用户环境，或再次盲目重装Torch。用户本轮明确先解释和分析，故不修改安装程序或重打包。
 
 远端尚需读取/opt/shore-h200-cu128/bootstrap-cu128-logs.dPmfHXa9/cuda-preflight/run-20261103T145224Z-562d22df78/torch_find_cuda.stderr.log和同目录stdout，以确认本次实际exit1是否与已复现缺陷一致；report.json本身只汇总退出码，没有具体CMake错误。后续应先修复并真实验证预检的CMake初始化/调用方式，再恢复完整安装，而不在本轮提前声称已修好。
+
+### 7.95 当前Torch缺失、持久化续传与CMake真实修复（2026-11-04）
+
+用户最新隔离解释器检查明确报ModuleNotFoundError: No module named torch。当前下载79.3/820.3MB、27.1kB/s、断连续传只说明文件未完成；和早先成功target_probe之间的实例/环境/日志差异尚不能自行解释，当前结果为准。不得让用户以为下载或此前日志代表当前已经安装Torch，也不能把新下载瓶颈说成已解决CMake问题。
+
+新增prepare_torch_wheel.py固定Python3.12/Linux x86_64/cu128精确wheel，官方SHA为d252cf975fb18c94a85336323ad425f473df56dab35a44b00399bd70c7a3b997，大小820326880。已实际读取官方索引、HEAD与1KB Range响应206；未完整下载真实大wheel。下载器仅用stdlib与curl，将.part、锁及逐次回执保存至/opt/shore-h200-cu128/wheelhouse，跨运行续传并在两个官方host间切换；只有精确大小及全文件SHA通过才发布whl。不接受任意下载URL，不静默覆盖未知完整文件，失败保留数据；不自动扫描或迁移旧pip临时79MB。
+
+bootstrap在未安装精确Torch时自动准备上述本地wheel再交pip，精确版本已安装时不请求大wheel；原Torch/vision/audio/cu128约束保持。新增真实本机curl断流Range回归，验证4000→11000字节续传、跨次保留、哈希错误/404/重定向不被误报成功；13项下载器测试通过。持久化能避免后续从零开始，不保证外网吞吐提高；旧安装须先退出，避免两进程并发操作同一环境。
+
+preflight补include(CMakeInitializeConfigs)，失败JSON带最多4096字符的真实诊断尾部。20项预检测试通过，其中2项执行真实CMake4.4.4，旧脚本必报Unknown init function，修复后通过且缺头文件仍拒绝。另用真实CMake执行官方Torch2.11完整FindCUDA及4个官方helper完成初始化验证，CUDA文件/版本/内部缓存为明确fixtures，未真实检测Linux Toolkit、执行nvcc或GPU。不得把这个最小复现称为完整CUDA构建验收。
+
+安装器v4为2026-11-04.persistent-torch-cmake-v4，默认七组件目录/opt/shore-image-tools-v4，保留原环境与v3。配套组件固定Git提交66950e93eed55241469fc30587f45a24ad86fea1及各自原始SHA；prepare_cpu入口同步七组件。公开完整回归243通过/4平台跳过；定向47过/1跳过为重复覆盖，不叠加总数。用户无需重传整个项目，可在远端下载校验小型新入口再运行；必须先激活discoverphy，不从无网H200执行安装。本轮没有使用外部模型API、加载真实模型或取得远端完整安装成功证据。
 
 ## 8. 当前仓库的可复用部分与已确认缺口
 

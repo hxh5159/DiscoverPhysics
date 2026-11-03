@@ -21,6 +21,7 @@ REQUIRED = {
     'bootstrap_cuda128.sh', 'prepare_h200_offline_cache.py',
     'verify_h200_cuda128.py', 'pip_index_install.py',
     'preflight_cuda128_build.py', 'prepare_vllm_dependencies.py',
+    'prepare_torch_wheel.py',
 }
 
 
@@ -83,7 +84,7 @@ class FullInstallerOfflineTests(unittest.TestCase):
                                 text=True, encoding='utf-8', errors='replace', timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--resume', result.stdout)
-        self.assertIn('/opt/shore-image-tools-v3', result.stdout)
+        self.assertIn('/opt/shore-image-tools-v4', result.stdout)
 
 
 if __name__ == '__main__':
