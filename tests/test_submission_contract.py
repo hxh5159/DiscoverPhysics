@@ -120,11 +120,31 @@ class SubmissionTests(unittest.TestCase):
             with self.assertRaises(SubmissionError):
                 validate_manifest(value)
 
-    def test_host_and_traversing_model_paths_rejected(self):
-        for path in ("../weights", "weights/../secret", "/etc/shadow", "/models", "C:\\weights", "http://host/model", "weights//model"):
+    def test_traversing_or_non_posix_model_paths_rejected(self):
+        for path in ("../weights", "weights/../secret", "/models", "C:\\weights", "http://host/model", "weights//model"):
             value = manifest()
             value["models"][0]["path"] = path
             self.assert_path(lambda: validate_manifest(value), "$.models[0].path")
+
+    def test_direct_project_host_model_path_is_accepted_without_reading_it(self):
+        value = manifest()
+        value["models"][0]["path"] = "/inspire/hdd/project/team01/checkpoints/version2"
+        self.assertEqual(validate_manifest(value)["models"][0]["path"], value["models"][0]["path"])
+
+    @unittest.skipIf(os.name == "nt", "Host model paths target the Linux evaluation instance")
+    def test_explicit_host_file_check_checks_actual_checkpoint_and_digest(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            checkpoint = root / "checkpoint"
+            checkpoint.mkdir()
+            (checkpoint / "weight.bin").write_bytes(b"test-checkpoint")
+            value = manifest()
+            value["models"][0].update(path=checkpoint.as_posix(), sha256=artifact_digest(checkpoint))
+            checked = check_submission_files(value, root)[0]
+            self.assertEqual(checked["status"], "host_artifact_exists")
+            self.assertTrue(checked["sha256_verified"])
+            (checkpoint / "weight.bin").write_bytes(b"changed")
+            self.assert_path(lambda: check_submission_files(value, root), "$.models[0].sha256")
 
     def test_derived_model_keeps_whitelisted_base_and_valid_digest(self):
         value = manifest()
@@ -199,7 +219,8 @@ class SubmissionTests(unittest.TestCase):
             result = packager.build_starter(output, root=root)
             with ZipFile(output) as archive:
                 names = set(archive.namelist())
-                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "starter-manifest.json"})
+                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "FILE_LIST.txt", "starter-manifest.json"})
+                self.assertTrue(all(name in archive.read("FILE_LIST.txt").decode("utf-8") for name in names))
                 self.assertFalse(any(b"SECRET_MARKER_MUST_NOT_BE_PACKAGED" in archive.read(n) for n in names))
                 inventory = json.loads(archive.read("starter-manifest.json"))["files"]
                 for item in inventory:
@@ -230,7 +251,7 @@ class SubmissionTests(unittest.TestCase):
             unpacked = folder / "unpacked"
             with ZipFile(archive_path) as archive:
                 names = set(archive.namelist())
-                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "starter-manifest.json"})
+                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "FILE_LIST.txt", "starter-manifest.json"})
                 self.assertFalse(any(".project-memory" in name or "ScienceAgent" in name or "AGENTS" in name for name in names))
                 for name in names:
                     data = archive.read(name).lower()

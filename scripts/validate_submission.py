@@ -15,7 +15,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest", type=Path)
     parser.add_argument("--root", type=Path, help="Submission directory; default: manifest parent")
-    parser.add_argument("--check-files", action="store_true", help="Explicitly check relative model files; declared SHA-256 hashing may be expensive")
+    parser.add_argument("--check-files", action="store_true", help="Explicitly check declared relative/host model files; declared SHA-256 hashing may be expensive")
     args = parser.parse_args(argv)
     try:
         manifest = load_manifest(args.manifest)

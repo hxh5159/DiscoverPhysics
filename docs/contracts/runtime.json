@@ -1,11 +1,11 @@
 {
-  "runtime_version": "1.3.0",
-  "updated": "2026-11-02",
-  "status": "implemented_local_engineering_checks_target_linux_deployment_pending",
+  "runtime_version": "1.4.0",
+  "updated": "2026-11-03",
+  "status": "direct_project_execution_with_external_organizer_runtime",
   "outer_submission": {
     "manifest_schema": "submission.schema.json",
-    "identity": "受理时冻结经验证的清单和实际不可变镜像摘要；正式运行只使用该版本",
-    "entrypoint": "清单entrypoint参数数组，工作目录/submission；不经宿主机shell拼接",
+    "identity": "本次使用队伍当前项目、清单、配置及已保存模型；测评期间禁止编辑和改写所用权重，无须复制项目或制作镜像",
+    "entrypoint": "清单entrypoint参数数组，工作目录为队伍实际项目目录；shell=False直接执行，解释器用清单绝对路径或--agent-python",
     "world_order": [
       "Adam",
       "Lilith",
@@ -18,8 +18,8 @@
       "Lilin"
     ],
     "runs_per_world": 1,
-    "team_training_gpus_used": false,
-    "evaluation_gpu_allocation": "指挥部独立评测端4×H200，九宇宙顺序运行"
+    "team_training_gpus_used": "according_to_organizer_instance_allocation",
+    "evaluation_gpu_allocation": "同一实例内按指挥部安排使用GPU；复用队伍卡时释放相应显存，九宇宙顺序运行"
   },
   "session": {
     "console_protocol_version": "1.0.0",
@@ -38,9 +38,9 @@
     "early_agent_exit": "停止该局并保留最后有效配对；如为指挥部运行基础设施失败，标记故障等待修复重评，不发布伪零分"
   },
   "communication": {
-    "agent": "唯一官方认证控制台通道；生产Linux使用Unix socket，普通HTTP仅本机工程诊断",
+    "agent": "官方认证的本机HTTP JSON控制台；Unix socket保留兼容，同一认证协议，非外部API",
     "law": "只接受允许的测试初态和时刻，不含控制台凭证，不联网或读写文件",
-    "actual_permission_isolation": "生产容器断网、只读官方运行时，不挂载真实宇宙或评分文件；目标环境权限仍需验收"
+    "actual_permission_isolation": "当前采用队伍项目直接运行及测评期间禁止编辑的现场管理方式，不以本地进程或目录名称声称文件系统隔离"
   },
   "artifacts": {
     "per_world": [
@@ -64,7 +64,7 @@
     "manual_intervention_during_evaluation": false
   },
   "queue_and_ranking": {
-    "scope": "内部验证和正式比赛使用不同且持久化标记的队列数据库，不得混写",
+    "scope": "直接运行记录与工程诊断明确区分；四窗口受理次数由指挥部管理，最终按最高完整九界成绩排名",
     "deadline_basis": "成功受理时间，截止前受理的版本可在截止后完成评测",
     "deadline_persisted": true,
     "infrastructure_failure": "保留原受理版本，修复后重评，不当作候选科学失败",
@@ -77,10 +77,15 @@
     "private_ranking_metadata": "同次九宇宙C与加权C只存私有数据库，不进入反馈；缺元数据的旧记录须从已保存的匹配私有结果迁移后再排名"
   },
   "pending_release_checks": [
-    "正式空间、属性和物理时域配置及验证范围公开粒度",
-    "容器启动、候选执行、CPU/内存与输出资源profile的统一正式值",
-    "Linux Unix socket权限、Docker隔离和4H200真实白名单模型运行",
-    "模型启动/复用、完整任务实际耗时、并发容量和48小时内多次提交能力",
-    "正式镜像、权重revision与摘要核验及发布profile审批"
-  ]
+    "真实白名单权重在目标Linux/H200完成加载与生成",
+    "实际修改过的队伍项目、模型检查点和完整九宇宙运行耗时与吞吐"
+  ],
+  "resource_guardrails": {
+    "startup_seconds": 900,
+    "candidate_timeout_seconds": 120,
+    "shutdown_seconds": 30,
+    "exploration_wall_clock_seconds": 600,
+    "profile": "direct-v1",
+    "semantics": "启动、候选执行和关闭为运行护栏，不改变从首次mission起的600秒探索"
+  }
 }

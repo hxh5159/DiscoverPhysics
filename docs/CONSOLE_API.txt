@@ -14,8 +14,8 @@ rift.Console只传递指挥部允许的实验请求、观测和提交文件，�
 
 启动器注入RIFT_CONSOLE_URL和RIFT_SESSION_TOKEN，不应把令牌写入日志或提交说明。
 可通过Console(endpoint=..., token=..., timeout=...)显式配置，参数优先于环境变量。
-Linux隔离运行使用unix:///run/rift/console.sock；诊断可用完整HTTP地址，
-例如http://127.0.0.1:8000/v1/console。两种传输使用相同的POST /v1/console协议。
+直接项目运行使用指挥部设置的本机HTTP地址，例如http://127.0.0.1:8000/v1/console。
+Unix socket保留兼容；两种传输使用相同的POST /v1/console协议，均属于官方通信通道。
 HTTP客户端不使用环境代理、不跟随重定向；HTTPS使用系统证书校验。
 不提供自行联网的权限，实际可访问范围由指挥部运行环境控制。
 

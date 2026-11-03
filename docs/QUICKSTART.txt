@@ -3,7 +3,7 @@
 一、准备
 
 解压攻坚组开发包，进入同时含shore_agent、development_worlds和rift的包根目录。
-不需要克隆研究仓库，不需要指挥部私有包。已有官方镜像及本地模型时可直接进入第二步。
+不需要克隆研究仓库，不需要指挥部私有包。已有配置好的依赖与本地模型时可直接进入第二步。
 联网CPU制作CUDA12.8镜像、随后在无网H200运行的完整环境步骤见H200_OFFLINE_SETUP.txt。
 requirements.txt只列实验与拟合依赖；模型环境使用官方bootstrap流程，不宽松安装其他vLLM版本。
 
@@ -65,26 +65,38 @@ shore_agent/是可修改基础框架。可以改提示词、历史与记忆、�
 check/fit工具只使用已取得的观测，通过固定积分器检验模型自己提出的候选程序。
 完整可改/固定文件划分见PARTICIPANT_FILES.txt，law接口见LAW_API.txt。
 
-五、准备交给指挥部的同一方案
+五、使用当前项目进行正式测评
+
+队伍保留自己的实际项目目录、入口、提示词、工具和模型路径，不要求另外打包镜像。
+生成清单时填写当前使用的实际模型和实验Python；无需复制权重。例如：
 
   "$PY" scripts/make_submission.py --model "$MODEL" --team-id team01 \
-    --submission-id team01-v1 --output submission.json
-  "$PY" scripts/validate_submission.py submission.json
+    --submission-id team01-v1 --model-root "$MODELROOT" --python "$PY" \
+    --output submission.json
+  "$PY" scripts/validate_submission.py submission.json --root . --check-files
 
-生成的是小型启动清单，包含同一基础agent入口和模型容器路径；不会复制大模型。
-自训或自行合并后的检查点需按指挥部登记的冻结路径填入--model-path及正确adaptation，
-对应源码、提示词、工具、合法公开记忆也随本次方案冻结。只交权重不能表达提示词等策略变化。
+训练后的模型可用--model-path checkpoints/version2 --adaptation sft指定；也可填写实际
+Linux绝对路径。自定义智能体修改清单entrypoint为自己的参数数组，并保留Console接口。
+在六公开环境先用同一入口自检。模型推理环境可通过入口的--model-python或环境变量指定：
 
-使用已在本机导入的官方离线基础镜像制作本队镜像：
+  export SHORE_MODEL_PYTHON="$MPY"
 
-  "$PY" scripts/build_runtime_images.py --base-image "$LOCAL_BASE_IMAGE" \
-    --manifest submission.json --agent-tag shore-agent:team01-v1 \
-    --output image-ids-team01-v1.json
+窗口开始后停止编辑代码、提示词和配置，不覆盖本次所用检查点。若复用的模型服务在
+更新权重前已启动，应先让服务重新加载本次权重。评测调用当前项目，不猜测最新目录。
 
-LOCAL_BASE_IMAGE是实际本地镜像名或ID。命令不联网拉镜像或安装依赖，生成的agent镜像
-保存本队程序，candidate镜像用于固定候选推演；镜像ID写入小型回执。平台镜像保存与
-Docker导入是两种操作，只有docker image inspect能找到的本地基础镜像可直接使用本命令。
+指挥部将九宇宙运行包接入实例后，在本队项目根目录执行固定入口：
 
-指挥部在自己的隔离端运行同一entrypoint，注入九隐藏环境控制台并只读挂载已登记模型。
-攻坚组无需拿到九个真实模拟器；正式端不把观测、对话、候选、日志或更新权重归还给队员。
-正式结果只返回规定总分、各宇宙总分及必要启动/格式错误。六公开成绩不进入正式榜单。
+  "$PY" scripts/evaluate_submission.py \
+    --organizer-root "$ORGANIZER_ROOT" \
+    --manifest submission.json --output "$ORGANIZER_RESULTS/run01"
+
+ORGANIZER_ROOT由指挥部设为外接九宇宙运行包目录；ORGANIZER_RESULTS为指挥部保留
+运行材料的位置。两者均由指挥部填写，不要求队伍获得该包。可加--check-only检查启动
+清单、路径及运行配置而不调用模型；格式通过不保证模型显存或实际生成成功。
+若入口中使用python且需要指定环境，可加--agent-python "$PY"；显式绝对解释器路径
+则直接按清单执行。完整运行始终覆盖九宇宙，逐界自动实验、提交law.py/claims.json、
+由指挥部固定积分和评分，不要求人工补交九份规律。
+
+未接入环境时命令明确报organizer_runtime_missing，不尝试下载或用公开世界冒充正式世界。
+正式summary.json及反馈只包含规定总分和各宇宙总分，分项及运行材料由指挥部保留。
+窗口结束后由指挥部清理九宇宙环境。六公开成绩不进入正式榜单。

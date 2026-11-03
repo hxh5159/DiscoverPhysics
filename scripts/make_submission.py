@@ -6,14 +6,14 @@ from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from rift.model_registry import model_spec
+from rift.model_registry import catalog, model_spec
 from rift.submission import validate_manifest
 
 
 def make_manifest(model, team_id, submission_id, *, version='1.0.0',
-                  model_path=None, adaptation='base', python='python'):
+                  model_path=None, model_root=None, adaptation='base', python='python'):
     item = model_spec(model)
-    path = model_path or '/models/'+item['directory']
+    path = model_path or (Path(model_root or catalog()['model_root'])/item['directory']).as_posix()
     return validate_manifest({'schema_version': '1.0.0', 'team_id': team_id,
         'submission_id': submission_id, 'version': version,
         'entrypoint': [python, '-m', 'shore_agent.agent', '--model', item['id'], '--model-path', path],
@@ -26,14 +26,15 @@ def main(argv=None):
     p.add_argument('--team-id', required=True)
     p.add_argument('--submission-id', required=True)
     p.add_argument('--version', default='1.0.0')
-    p.add_argument('--model-path', help='registered /models/... or packaged relative checkpoint directory')
+    p.add_argument('--model-root', help='actual Linux root containing the supplied model directories')
+    p.add_argument('--model-path', help='actual Linux model path or project-relative checkpoint directory')
     p.add_argument('--adaptation', choices=('base','quantized','sft','rl','other'), default='base')
-    p.add_argument('--python', default='python', help='experiment Python path inside the submitted image')
+    p.add_argument('--python', default='python', help='actual experiment Python executable on this instance')
     p.add_argument('--output', required=True, type=Path)
     a = p.parse_args(argv)
     try:
         manifest = make_manifest(a.model,a.team_id,a.submission_id,version=a.version,
-            model_path=a.model_path,adaptation=a.adaptation,python=a.python)
+            model_path=a.model_path,model_root=a.model_root,adaptation=a.adaptation,python=a.python)
         a.output.parent.mkdir(parents=True,exist_ok=True)
         with a.output.open('x',encoding='utf-8') as stream:
             json.dump(manifest,stream,ensure_ascii=False,indent=2)

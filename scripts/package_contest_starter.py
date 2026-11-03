@@ -22,10 +22,12 @@ PUBLIC_FILES = (
     "development_worlds/runner.py", "development_worlds/README.md",
     "scripts/__init__.py", "scripts/validate_claims.py", "scripts/validate_law.py", "scripts/validate_submission.py",
     "scripts/serve_model.py", "scripts/build_runtime_images.py", "scripts/make_submission.py",
+    "scripts/evaluate_submission.py",
     "scripts/bootstrap_cuda128.sh", "scripts/prepare_h200_offline_cache.py",
     "scripts/verify_h200_cuda128.py", "requirements.txt",
     "docs/LAW_API.txt", "docs/CONSOLE_API.txt", "docs/SUBMISSION_API.txt", "docs/CONTEST_WORKFLOW.txt",
     "docs/QUICKSTART.txt", "docs/PARTICIPANT_FILES.txt", "docs/MODEL_RUNTIME.txt", "docs/MODELS.txt",
+    "docs/CODE_AND_SUBMISSION_SPEC.txt", "docs/彼岸物理规律发现挑战赛_赛题说明_更新版.pdf",
     "docs/H200_OFFLINE_SETUP.txt", "docs/CUDA128_SETUP.txt",
     "docs/contracts/claims.schema.json", "docs/contracts/claims.example.json",
     "docs/contracts/law_api.json", "docs/contracts/law_case.schema.json",
@@ -54,7 +56,10 @@ START_HERE = '''攻坚组开发与实验起步包
 实际默认入口python -m shore_agent.agent会加载所选本地模型并自动探索；没有模型就明确报错。
 公开开发驱动和正式驱动使用相同Console及law.py/claims.json提交接口。
 提交根目录为包含shore_agent、rift和提交清单的完整工作区，不再只复制examples目录。
-正式控制台地址、会话令牌及模型只读挂载由指挥部运行器提供。
+正式测评直接运行本队当前项目；测评期间停止编辑代码、配置及所用权重。
+模型从本队配置的实际目录加载，正式控制台地址及会话令牌由指挥部运行器提供。
+九宇宙环境由指挥部接入后，使用scripts/evaluate_submission.py统一启动；
+正式模拟、固定积分评分和隐藏运行材料由指挥部管理，不要求重新封装本队镜像。
 本包不含正式九宇宙的真实模拟器、定律参数或隐藏验证真值，也不附带权重和凭证。
 六公开运行的观测及日志可保留；九隐藏运行材料由指挥部保留，赛中只返回规定成绩和必要错误。
 '''
@@ -111,12 +116,19 @@ def build_starter(output, *, root=ROOT, overwrite=False):
                 raise ValueError(f"Public source path must not contain symlinks: {relative}")
         payloads[relative] = _public_bytes(relative, lexical.read_bytes())
     payloads["START_HERE.txt"] = START_HERE.encode("utf-8")
+    listed = sorted(set(payloads) | {"FILE_LIST.txt", "starter-manifest.json"})
+    payloads["FILE_LIST.txt"] = ("攻坚组开发包文件清单（不含九宇宙真实模拟器/真值）\n"
+        + "文件总数：" + str(len(listed)) + "\n\n" + "\n".join(listed) + "\n").encode("utf-8")
     inventory = [{"path": path, "sha256": hashlib.sha256(data).hexdigest()}
                  for path, data in sorted(payloads.items())]
-    manifest = {"starter_schema_version": "1.1.0", "contains_formal_world_simulators": False,
+    manifest = {"starter_schema_version": "1.2.0", "contains_formal_world_simulators": False,
                 "contains_public_development_worlds": True, "public_worlds": ["1", "2", "3", "4", "5", "6"],
                 "contains_editable_llm_baseline": True,
-                "contains_model_weights": False, "files": inventory}
+                "contains_model_weights": False,
+                "formal_execution_mode": "direct_project",
+                "formal_entrypoint": "scripts/evaluate_submission.py",
+                "requires_external_organizer_runtime": True,
+                "files": inventory}
     manifest["public_contract_projection"] = "Normative public contracts only; internal design reviews excluded; schema identifiers use the participant namespace. Scoring and numerical rules are unchanged."
     payloads["starter-manifest.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2)+"\n").encode("utf-8")
     output.parent.mkdir(parents=True, exist_ok=True)

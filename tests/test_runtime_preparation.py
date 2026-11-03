@@ -19,8 +19,17 @@ class RuntimePreparationTests(unittest.TestCase):
                 result=make_manifest(item['id'],'team01','run01')
                 self.assertEqual(result['models'][0]['base_model'],item['base_model'])
                 self.assertEqual(result['models'][0]['path'],result['entrypoint'][-1])
-                self.assertEqual(result['models'][0]['path'],'/models/'+item['directory'])
+                self.assertEqual(result['models'][0]['path'],catalog()['model_root']+'/'+item['directory'])
                 self.assertEqual(validate_manifest(result),result)
+
+    def test_custom_actual_model_root_and_training_checkpoint(self):
+        self.assertEqual(make_manifest('27b','team01','run01',model_root='/inspire/team/models')['models'][0]['path'],
+                         '/inspire/team/models/Qwen3.8-27B')
+        result=make_manifest('27b','team01','run02',model_path='checkpoints/v2',adaptation='sft',
+                             python='/opt/team-env/bin/python')
+        self.assertEqual(result['entrypoint'][0],'/opt/team-env/bin/python')
+        self.assertEqual(result['models'][0]['path'],'checkpoints/v2')
+        self.assertEqual(result['models'][0]['adaptation'],'sft')
 
     def test_image_plan_is_local_and_does_not_copy_the_repository(self):
         settings=plan('already-imported:local',manifest='submission.json')

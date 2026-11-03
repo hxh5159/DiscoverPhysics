@@ -1,8 +1,8 @@
 """Validate an outer agent submission, without executing code or loading weights.
 
-The manifest declares a command and model provenance.  It never grants host
-mounts, network access, or permission to inspect the organizer environment.
-Container isolation and weight provenance review belong to the trusted runner.
+The manifest declares a command and model provenance for direct project runs.
+It grants no permission to inspect the organizer environment. Weight provenance
+review and evaluation-time access rules belong to the organizer.
 """
 from __future__ import annotations
 
@@ -52,13 +52,13 @@ def _keys(value, allowed, required, path):
 def _model_path(value, path):
     value = _text(value, path)
     if "\\" in value or ":" in value:
-        raise SubmissionError(path, "Use a relative POSIX path or /models/... inside the container.")
+        raise SubmissionError(path, "Use a relative POSIX path or an absolute Linux model path.")
     parts = value.split("/")
     if ".." in parts or "." in parts or "" in parts[1:]:
         raise SubmissionError(path, "Path traversal, repeated separators, and dot components are not accepted.")
     p = PurePosixPath(value)
-    if p.is_absolute() and (len(p.parts) < 3 or p.parts[1] != "models"):
-        raise SubmissionError(path, "Absolute model paths must be under the official /models mount.")
+    if p.is_absolute() and len(p.parts) < 3:
+        raise SubmissionError(path, "An absolute model path must identify a model directory or file.")
     return value
 
 
@@ -82,7 +82,7 @@ def validate_manifest(value):
     if executable in _SHELLS:
         raise SubmissionError("$.entrypoint[0]", "Launch the agent executable directly, rather than a shell wrapper.")
     if "\\" in command[0] or ":" in command[0] or ".." in command[0].split("/"):
-        raise SubmissionError("$.entrypoint[0]", "Expected a container executable or a non-traversing POSIX path.")
+        raise SubmissionError("$.entrypoint[0]", "Expected an executable or a non-traversing POSIX path.")
     models = value["models"]
     if not isinstance(models, list) or not models:
         raise SubmissionError("$.models", "Declare at least one model from the published whitelist.")
@@ -160,7 +160,8 @@ def artifact_digest(path):
     """Hash a file, or a directory's sorted [{path,sha256}] inventory.
 
     Deliberately explicit: hashing a multi-gigabyte model can be expensive.
-    Symlinks are not followed; absolute official mounts are checked by deploy.
+    Symlinks are not followed. Reading every tensor is only done when explicitly
+    requested by a declared digest, and may take considerable time.
     """
     path = Path(path)
     if path.is_symlink():
@@ -181,9 +182,10 @@ def artifact_digest(path):
 
 
 def check_submission_files(value, root):
-    """Check relative model artifacts under root, never arbitrary host paths.
+    """Explicitly check declared relative or absolute host model artifacts.
 
-    /models references are returned as deferred mount checks.  This operation
+    Legacy /models references remain deferred checks for the old deployment.
+    Other absolute paths are checked only through this explicit operation. It
     does not load weights or prove model provenance, and does not inspect code.
     """
     value = validate_manifest(value)
@@ -193,22 +195,25 @@ def check_submission_files(value, root):
     checked = []
     for i, model in enumerate(value["models"]):
         item = {"path": model["path"], "sha256_verified": False}
-        if PurePosixPath(model["path"]).is_absolute():
+        declared = PurePosixPath(model["path"])
+        if declared.is_absolute() and declared.parts[1] == "models":
             item["status"] = "official_mount_check_deferred"
         else:
-            lexical = root.joinpath(*PurePosixPath(model["path"]).parts)
+            lexical = Path(model["path"]) if declared.is_absolute() else root.joinpath(*declared.parts)
             resolved = lexical.resolve()
-            if not resolved.is_relative_to(root):
+            if not declared.is_absolute() and not resolved.is_relative_to(root):
                 raise SubmissionError(f"$.models[{i}].path", "Model artifact resolves outside the submission root.")
-            # Reject intermediate symlinks as well as a symlink at the leaf.
-            current = root
-            for part in PurePosixPath(model["path"]).parts:
-                current = current / part
-                if current.is_symlink():
-                    raise SubmissionError(f"$.models[{i}].path", "Packaged model paths must not use symlinks.")
+            # Relative packaged artifacts must stay within the project. An
+            # explicitly named host checkpoint may use a platform path alias.
+            if not declared.is_absolute():
+                current = root
+                for part in declared.parts:
+                    current = current / part
+                    if current.is_symlink():
+                        raise SubmissionError(f"$.models[{i}].path", "Packaged model paths must not use symlinks.")
             if not resolved.exists():
                 raise SubmissionError(f"$.models[{i}].path", "Declared local model artifact does not exist.")
-            item["status"] = "local_artifact_exists"
+            item["status"] = "host_artifact_exists" if declared.is_absolute() else "local_artifact_exists"
             if "sha256" in model:
                 actual = artifact_digest(resolved)
                 if actual != model["sha256"]:

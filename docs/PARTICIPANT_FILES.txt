@@ -1,52 +1,46 @@
 文件安排与修改范围
 
-本文件路径相对于攻坚组开发包根目录。完整项目仓库和指挥部测试仓库不是参赛发放包。
+路径相对于攻坚组开发包根目录。完整研究仓库和指挥部测试仓库不是参赛发放包。
 
 一、可以修改或替换
 
-shore_agent/__init__.py、agent.py       基础LLM探索主循环、提示词、历史和动作策略。
-shore_agent/tools.py、tool_worker.py   基础候选诊断/参数拟合工具；只能使用合法观测。
-shore_agent/models.py                 基础本地模型接入，可自行改进推理方式。
-examples/agent.py                     转发到基础agent的便利入口，可替换为自己的程序。
-examples/submission.json              启动清单例；实际清单用make_submission.py生成后改本组信息。
-examples/law.py、law_case.json         格式与候选推演示例，不是正式宇宙答案。
-examples/Dockerfile.agent             本队执行镜像模板；可增加自己的模块和配置。
+shore_agent/                         基础LLM主循环、提示词、上下文、工具、拟合与模型接入。
+examples/agent.py                     转发到基础agent的入口，可改为自己的实现。
+examples/submission.json              清单例；实际清单填写本组入口与实际模型路径。
+examples/law.py、law_case.json         候选接口例，不是正式宇宙答案。
+自己的训练、符号回归、记忆、提示词、配置和checkpoint可另放目录，无须统一内部命名。
+正式测评直接从本队当前项目启动；期间停止编辑，不覆盖所用权重。保留统一启动与交卷协议。
+最终law.py/claims.json由agent在每个宇宙运行时自动生成并通过控制台提交。
 
-自己的SFT/RL、符号回归、记忆、提示词文件和训练结果可以另放目录，不要求固定命名。
-最终law.py/claims.json由运行中的agent按每个宇宙自动生成并通过控制台提交。
+二、公开可见，标准测评由指挥部固定版本执行
 
-二、公开可见，标准评测使用官方固定版本
-
-rift/、rift_numerics/                  控制台客户端、law格式/输入检查及固定积分器。
+rift/、rift_numerics/                  控制台客户端、候选接口检查、固定积分与运行组件。
 rift/model_registry.py、model_catalog.json
-                                      模型名称、精度和路径登记；别名不改变实际精度。
+                                      白名单名称、精度和实际模型目录；不证明权重来源。
 scripts/validate_*.py                 格式检查，不判断物理正误。
 docs/contracts/                      实验、时间、噪声、提交、计分和反馈契约。
-development_worlds/worlds.py          六公开宇宙的全部真实数值模拟器。
-development_worlds/catalog.py         六公开操作范围、首光和公开验证条件。
-development_worlds/console.py         带噪声与配额的标准开发实验。
-development_worlds/service.py         与正式相同的控制台传输、草稿和提交生命周期。
-development_worlds/evaluation.py      候选law.py固定积分、干净真值和公开分项计分。
-development_worlds/runner.py          六公开批量完整运行入口，使用会话账本计算能量。
+development_worlds/                   六公开真实模拟器、操作范围、验证案例、控制台及评分。
 
-六公开源码可阅读并用于合法训练数据生成，可以另做研究性副本。标准自测应调用固定评测器；
-更改副本或直接读公式得到的开发成绩不代表未知环境发现能力，不影响正式固定评测实现。
+六公开源码可阅读并用于合法训练数据生成，可以另做研究性副本。标准自测须调用固定
+评分器；本地修改积分/评分副本不会改变指挥部正式结果。六公开成绩不进入正式榜单。
 
-三、依赖与辅助操作
+三、辅助程序与文档
 
-requirements.txt                     CPU实验依赖；GPU依赖由CUDA12.8安装流程单独准备。
-scripts/serve_model.py                七模型统一启动/只读预检，支持无GPU的plan-only。
-scripts/make_submission.py            生成小型提交清单，不复制权重。
-scripts/build_runtime_images.py       依据已安装的本地离线基础镜像构建agent/candidate。
-scripts/bootstrap_cuda128.sh          联网端环境安装；--cpu-build-for h200用于CPU制镜像。
-scripts/prepare_h200_offline_cache.py  CPU端预下载内核及本地校验。
-scripts/verify_h200_cuda128.py         无网H200基础验收，不冒充真实模型推理测试。
+requirements.txt                     CPU实验与拟合依赖；GPU依赖由CUDA12.8流程安装。
+scripts/serve_model.py                七模型预设启动和预检；模型路径使用实际宿主目录。
+scripts/make_submission.py            生成清单，不复制权重；支持实际模型或checkpoint路径。
+scripts/evaluate_submission.py        固定公开入口；外接指挥部九宇宙包后委托完整测评。
+scripts/bootstrap_cuda128.sh          依赖安装；CPU准备后可在无网H200运行。
+scripts/prepare_h200_offline_cache.py  离线内核准备。
+scripts/verify_h200_cuda128.py         基础环境验证，不等于模型推理或九界整轮通过。
 docs/QUICKSTART.txt、MODEL_RUNTIME.txt、MODELS.txt、H200_OFFLINE_SETUP.txt
-                                      运行命令、环境与模型说明。
+                                      完整命令、模型与环境说明。
+examples/Dockerfile.*、scripts/build_runtime_images.py
+                                      历史可选部署辅助，当前直接项目正式测评不要求使用。
 
-四、只在指挥部运行
+四、仅由指挥部接入和保管
 
-九隐藏宇宙真实模拟器、真实规律与参数、声明真值、隐藏验证轨迹；正式实验服务、
-冻结收卷、隔离执行、评分、队列、榜单和部署配置。以上不在本参赛包内。
-模型通过指挥部受信登记的只读路径接入；组员代码不能自行把宿主私有目录变为可见挂载。
-指挥部保留九隐藏运行材料；赛中成绩响应不包含预言/定律/节约分项或声明正确性。
+九隐藏宇宙真实模拟器、真实规律与参数、声明真值、隐藏验证轨迹；正式服务、固定积分
+评分驱动和本次运行材料。以上不属于参赛开发包。指挥部接入该环境后，使用本队当前
+代码、配置和权重，自动完成九宇宙实验与计分；不要求队伍接触这些真实环境文件。
+赛中只反馈总分、各宇宙总分及必要启动/格式错误，不反馈预言/定律/节约分项或声明正误。

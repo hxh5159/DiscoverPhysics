@@ -25,7 +25,7 @@
     "fixed_math_constants": "允许固定数学字面量/只读常量及np.pi/math.pi等纯算术；可定义数学辅助函数",
     "execution": "确定性纯数学计算，不读写文件、不联网、不使用随机或外部可变状态；不导入/替换积分器，不在顶层启动工作流",
     "technical_source_bytes_default": 1048576,
-    "technical_limit_scope": "格式/资源护栏明确报错，不新增科学得分。正式镜像和资源配置须统一公布"
+    "technical_limit_scope": "格式/资源护栏明确报错，不新增科学得分。正式固定数学环境和运行护栏统一说明"
   },
   "acceleration": {
     "t": "绝对物理时间；积分内部子步可能不在公开0.005采样网格，不得在回调内把t吸附到网格",
@@ -70,5 +70,5 @@
     "organizer_errors": "官方case/grid无效或运行基础设施失败应中止并修复/重评，不能直接算作队伍物理预测错误",
     "status_limit": "本地预检通过不保证隐藏测试科学正确，不新增代码分或自洽分"
   },
-  "implementation_boundary": "公开候选SDK/加载/worker与私有配对/评测桥已实现并测试；真实控制台与正式服务权限/榜单/远端镜像仍需集成验收。无正式九宇宙真值代码进入此SDK"
+  "implementation_boundary": "公开候选SDK/加载/worker与指挥部配对/评测桥已实现；直接项目入口外接九宇宙服务，真实GPU模型运行单独验收。SDK不含正式九宇宙真值"
 }
