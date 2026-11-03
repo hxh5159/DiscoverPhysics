@@ -34,7 +34,7 @@
 
 **远端路径最新约定（2026-11-02，长期有效）：** 主项目固定为`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics`，测试资料库固定为同级`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/test`；除用户另行说明，后续所有命令使用这两个路径。模型根仍为`/inspire/hdd/project/26-the-other-shore/public/models`，镜像内`/opt/shore-*`环境位置不变。此前urbanlowaltitude下的项目/测试路径仅作历史；原Conda若仍装在旧位置，可作为现存工具使用，不表示项目仍在那里。详见7.80。
 
-**CPU安装入口最新约定（2026-11-03）：** 推荐`scripts/prepare_cpu_h200.sh --dependencies-only`，下载成功后以短命令执行。依赖与离线资源仅装在`/opt/shore-*`，不要求CPU实例挂载项目/模型盘，也不访问或创建指定的运行项目路径、不克隆或解压测试资料。默认完整项目准备模式仍保留共享挂载检查；H200运行时的项目/模型路径与离线要求不变。此约定覆盖7.81把安装和共享盘绑定的部分，详见7.82。
+**CPU安装入口最新约定（2026-11-03）：** 当前Conda CUDA工具链应使用已含CUDA头文件路径修复的`scripts/install_all_dependencies.sh`（c0b68da起），下载到新文件并验证摘要；不要再次运行修复前固定链接保存的旧文件。依赖与离线资源仅装在`/opt/shore-*`，不要求CPU实例挂载项目/模型盘、克隆或解压测试资料。此前prepare_cpu_h200.sh --dependencies-only的挂载解耦仍保留，但其固定旧bootstrap本身未补Conda头文件导出，当前恢复命令优先使用完整安装器，详见7.91。H200执行路径及CPU联网/H200离线分工不变。
 
 **正式赛题完整性最新复审（2026-11-03，本轮落实）：** scripts/evaluate_submission.py委托外接direct_project_eval.py，从队伍实际cwd、解释器/环境和模型配置运行；清单接受合法宿主/相对路径。直接正式模式与旧诊断区分，不伪造镜像身份；指挥部固定SDK/科学源/参考仍核验。交付说明、8页/12页文稿及direct-v1配置同步；两个实际ZIP已用修改过的队伍项目、基础agent和本机脚本化ModelClient，在九真实环境中完成36次合法实验/草稿/交卷动作、固定积分、评分及汇总复算。超时、坏提交、无稿、基础设施故障与限定反馈另经集成测试；尚无真实白名单权重/H200运行证据，不能据此宣称模型部署和能力通过，见7.90及docs/RUN_READINESS_CHECK.txt。
 
@@ -1400,6 +1400,18 @@ H200阶段在同路径挂载共享盘，source离线环境，使用trial Python�
 
 运行要点：在队伍当前项目执行python scripts/evaluate_submission.py --organizer-root 指挥部运行包目录 --manifest submission.json --output 本次全新指挥部保留目录；可指定--agent-python，--check-only不执行模型和实验。逐窗手工控制次数，不拼历史逐界最好分；独立输出的最高完整成绩由指挥部汇总。组委会不得把重新生成默认清单当成受理，避免覆盖队伍自定义入口和策略。实例/镜像保存复制上传仍由用户负责。
 
+### 7.91 安装日志仍对应修复前安装器，固定新版恢复（2026-11-03）
+
+用户新附件9645f2fb的vLLM安装尾部明确：CXX12.4、Python3.12.16和nvcc12.8已找到，CMake/PyTorch的FindCUDA缺CUDA_INCLUDE_DIRS，Caffe2配置失败；并非从文件复制输出判断失败原因。未进入模型加载，不能由此认定CUDA/驱动版本冲突或全部依赖未安装。
+
+重要证据：日志为install_all_dependencies.sh阶段4/7第302行，恰与c0b68da之前调用bootstrap的位置一致；c0b68da增加28行Conda CUDA布局处理后同调用在330行，且297行先执行configure_cuda_layout。bootstrap未清除CUDA_INC_PATH/CUDA_LIB_PATH/CMAKE_PREFIX_PATH，pip env只清两PIP索引；没有发现修复被子脚本覆盖的证据。最可能仍使用先前固定URL下载的旧安装器，不能把这次日志直接当作已修复脚本无效的证据。
+
+恢复命令固定已推送065ca8a69789002956ec4f19a66496ce15d4f198的scripts/install_all_dependencies.sh，Git原始字节SHA256为20e127255867ffb5162b570fb517d589e8d51e9080fa698c88fae47ef6f491cf；下载到新的/tmp/shore-install-all-cuda128-fixed.sh，校验后沿用用户内网pip参数运行。该版本识别toolchain/targets/x86_64-linux/include或include及真实libcudart目录，导出Torch FindCUDA所用路径，打印“CUDA开发头文件”和“CUDA运行库”。已装同版本依赖通常可复用，不删除旧环境、不换Torch/CUDA版本；不能保证用户远端尚未执行的新编译已通过。
+
+查阅PyTorch v2.11.0官方FindCUDA源码确认device_functions.h及CUDA_INC_PATH搜索；vLLM v0.24.0 setup.py按CUDA_HOME指定nvcc且继承环境。离线实际提取当前布局函数测试4项通过：平铺布局、Conda targets布局、缺头文件拒绝、缺运行库拒绝。仅测试临时目录及Bash，不安装依赖、不调用GPU/模型/API。Git Bash测试在沙盒被MSYS对象权限阻断，同样测试获本机执行权限后通过，不当作远端安装问题。
+
+本轮不改变安装脚本、已验证交付ZIP、宇宙或计分，只同步诊断记忆；用户需在可联网安装实例实际运行校验后的脚本。若新版仍失败，应使用新日志和上述实际目录定位，不能继续盲目重复旧固定链接或虚称已安装成功。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
@@ -1667,3 +1679,5 @@ N-body 与网格场后端有边界、平滑和离散方式的差异，不能默�
 | 2026-11-03 | 按直接项目方式复核完整性：核心六公开/九隐藏实验、交卷、固定积分和计分已有内部闭环；正式入口仍有镜像受理、本地诊断限制、宿主模型路径及解释器环境适配阻断。统一就绪报告，明确待补入口、交付同步和真实九界验收，不重提容器封装为必需；本轮仅记录，无代码/包/规则修改或模型运行。 |
 
 | 2026-11-03 | 落实单实例直接项目正式入口、宿主模型路径、固定direct-v1配置及文档交付；8/12页局部同步并全页QA，starter-v5/运行direct-v1为69/107文件并附完整清单。实际两ZIP在修改项目、基础agent和脚本化本机模型服务中跑完九真实环境36动作及固定积分评分；公开184过、私有122过，6平台相关跳过，r7→r8刷新保护通过。105项科学/参考/用户PPT哈希保持；未加载真实权重/GPU或调外部API，不冒充H200能力验收。 |
+
+| 2026-11-03 | 新vLLM失败日志为FindCUDA缺include；302行与修复前安装器一致，当前修复版调用330行，未见子脚本清除CUDA路径。固定065ca8a安装脚本原字节摘要并给新文件校验恢复命令，4项布局检测离线通过。仅更新记忆，不改脚本/包/版本或执行远端安装，不能把本次日志当作新版已运行仍失败。 |
