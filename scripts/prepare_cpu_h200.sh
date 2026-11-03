@@ -13,7 +13,7 @@ TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 PLAN=0
 DEPENDENCIES_ONLY=0
 # These independent environment helpers share a fixed, previously published revision.
-DEPENDENCY_SOURCE_REF='20a87a71128be6e7ce577133f825b31149884ca8'
+DEPENDENCY_SOURCE_REF='2d1a5e4668e87ed5df960b9ccdc5c6b217283c8f'
 PHASE='解析参数'
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }

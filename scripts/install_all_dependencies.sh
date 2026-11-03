@@ -9,7 +9,7 @@ umask 077
 
 ENV_ROOT='/opt/shore-h200-cu128'
 TOOL_ROOT='/opt/shore-h200-toolchain'
-SCRIPT_ROOT='/opt/shore-image-tools-v2'
+SCRIPT_ROOT='/opt/shore-image-tools-v3'
 INDEX_URL="${SHORE_PIP_MIRROR:-}"
 TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 CONDA_BIN="${CONDA_EXE:-}"
@@ -17,10 +17,10 @@ JOBS="${SHORE_BUILD_JOBS:-2}"
 PLAN=0
 CHECK_ONLY=0
 RESUME=0
-INSTALLER_VERSION='2026-11-03.download-preflight-v2'
+INSTALLER_VERSION='2026-11-03.multiline-download-v3'
 PHASE='参数检查'
 LOG_FILE=''
-SOURCE_REF='20a87a71128be6e7ce577133f825b31149884ca8'
+SOURCE_REF='2d1a5e4668e87ed5df960b9ccdc5c6b217283c8f'
 
 die() { printf 'ERROR [%s]: %s\n' "$PHASE" "$*" >&2; exit 2; }
 stage() { PHASE="$1"; printf '\n========== %s ==========\n' "$PHASE"; }
@@ -43,7 +43,7 @@ Usage:
 Options:
   --env-root PATH     Python environments/cache root (default /opt/shore-h200-cu128)
   --tool-root PATH    Conda CUDA/compiler toolchain (default /opt/shore-h200-toolchain)
-  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v2)
+  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v3)
   --conda-exe PATH    Existing Conda executable; otherwise discover CONDA_EXE/PATH
   --jobs NUMBER       CPU build jobs (default SHORE_BUILD_JOBS or 2)
   --plan              Print the complete installation plan; no filesystem/network changes
@@ -339,7 +339,7 @@ fetch_helper() {
 fetch_helper bootstrap_cuda128.sh 4fd9f6ecc308ea6a2691f4632ee46f423d8c81be4c5b856d435773f185f6c4de
 fetch_helper prepare_h200_offline_cache.py 86989fe2f96c40284280c4d3d8e094dadafccf6646082617d65d41f1a9d449f1
 fetch_helper verify_h200_cuda128.py 5a1ebc8e5fbe1fc726701a8748f53e665ee05854befadccf334cad2ebae1ffc8
-fetch_helper pip_index_install.py e4c8685ea07678629d443262321139e909bdb06fe46aa4d31c6cc25cde060c7e
+fetch_helper pip_index_install.py 06019da034952e2e8e62fd79f2ff12d35fd7d168fb7a65af467e093ddfa658d7
 fetch_helper preflight_cuda128_build.py 19d0997e04cb414e1bb46e4fc9ff9ed1da822fcfd7ed873e9176f4f0bd0691f4
 fetch_helper prepare_vllm_dependencies.py 75b99561007ef14ef37fefb7bc13c405764725e9657a694717a015c070d21372
 

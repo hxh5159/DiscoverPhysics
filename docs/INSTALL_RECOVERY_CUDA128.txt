@@ -4,15 +4,34 @@ CUDA12.8/H200完整安装与恢复（2026-11-03）
 已有工具链且上次停在pip/vLLM阶段时加--resume，跳过Conda重新求解，保留已有环境。
 首次安装省略--resume。镜像/实例保存复制由使用者自行负责，不属于安装或测评协议。
 
-安装器版本标识：2026-11-03.download-preflight-v2。
-默认辅助脚本目录改为/opt/shore-image-tools-v2，保留旧/opt/shore-image-tools。
+安装器版本标识：2026-11-03.multiline-download-v3。
+默认辅助脚本目录为/opt/shore-image-tools-v3，保留旧v2与/opt/shore-image-tools。
 Python环境和CUDA工具链仍是/opt/shore-h200-cu128及/opt/shore-h200-toolchain。
 
 从当前项目运行：
   bash scripts/install_all_dependencies.sh --resume \
     --index-url "$SHORE_PIP_MIRROR" --trusted-host "$SHORE_PIP_MIRROR_HOST"
 
+当前Triton镜像断连恢复（已经到阶段4，工具链已完成；在同一可联网实例执行）：
+
+  SHORE_CONDA_BASE="$(conda info --base)" &&
+  source "$SHORE_CONDA_BASE/etc/profile.d/conda.sh" &&
+  conda activate discoverphy &&
+  cd '/inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics' &&
+  git pull --ff-only &&
+  bash scripts/install_all_dependencies.sh \
+    --resume --conda-exe "$SHORE_CONDA_BASE/bin/conda" \
+    --index-url 'https://pypi.org/simple' --trusted-host 'pypi.org'
+
+本次恢复直连官方索引；不手动降级Triton，不删除现有环境，不重新求解已有工具链。
+同版本且已经满足约束的包继续复用；未完成下载的包可能需要重新下载。
+若又换成没有工具链的新实例，应省略--resume，而不是从旧实例记录推断环境仍存在。
+
 SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST使用平台提供的内网pip地址。
+如果内网镜像在Triton下载时反复主动断开，可仅为本次安装将index-url改成
+https://pypi.org/simple、trusted-host改成pypi.org；Torch/cu128等版本约束不变。
+新版识别pip的多行Failed to connect to <镜像主机>错误并触发备用索引。
+旧v2只按同一行查域名和原因，可能漏掉这类错误，不应反复运行旧助手。
 也可下载此脚本的已发布固定版本后执行；脚本内部按固定Git提交和SHA获取匹配组件，
 不需要为了安装环境先克隆项目。不要继续使用之前固定旧提交的下载链接。
 

@@ -83,7 +83,7 @@ class FullInstallerOfflineTests(unittest.TestCase):
                                 text=True, encoding='utf-8', errors='replace', timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--resume', result.stdout)
-        self.assertIn('/opt/shore-image-tools-v2', result.stdout)
+        self.assertIn('/opt/shore-image-tools-v3', result.stdout)
 
 
 if __name__ == '__main__':

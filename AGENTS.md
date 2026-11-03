@@ -36,7 +36,7 @@
 
 **远端路径最新约定（2026-11-02，长期有效）：** 主项目固定为`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/DiscoverPhysics`，测试资料库固定为同级`/inspire/hdd/project/26-the-other-shore/fengkairui-25026/test`；除用户另行说明，后续所有命令使用这两个路径。模型根仍为`/inspire/hdd/project/26-the-other-shore/public/models`，镜像内`/opt/shore-*`环境位置不变。此前urbanlowaltitude下的项目/测试路径仅作历史；原Conda若仍装在旧位置，可作为现存工具使用，不表示项目仍在那里。详见7.80。
 
-**CPU安装入口最新约定（2026-11-03）：** 当前完整入口为`scripts/install_all_dependencies.sh`，版本标识2026-11-03.download-preflight-v2，固定发布提交b185d07；直接在更新后的主项目执行亦可。六配套组件固定到20a87a7及SHA，已包含Conda头文件定位、编译预检和镜像下载恢复；prepare_cpu_h200旧入口也已同步这些匹配组件，不再将其描述为尚未修复。已有完整工具链用--resume，首次安装省略；环境与离线资源在/opt/shore-*，不要求CPU实例有GPU、项目盘或模型盘。默认助手目录为/opt/shore-image-tools-v2，不覆盖旧助手，详见7.92；H200执行路径及CPU联网/H200离线分工不变。
+**CPU安装入口最新约定（2026-11-03）：** 当前完整入口为`scripts/install_all_dependencies.sh`，版本标识2026-11-03.multiline-download-v3；直接在更新后的主项目执行亦可。六配套组件固定到2d1a5e4及SHA，包含Conda头文件定位、编译预检、镜像404及新版pip多行断连恢复；prepare_cpu_h200旧入口也同步匹配组件。已有完整工具链用--resume，首次安装省略；环境与离线资源在/opt/shore-*，不要求CPU实例有GPU、项目盘或模型盘。默认助手目录为/opt/shore-image-tools-v3，不覆盖旧v2助手，详见7.93。当前Triton断连恢复仅本次直接用官方PyPI，默认镜像偏好不变；H200执行路径及CPU联网/H200离线分工不变。
 
 **正式赛题完整性最新复审（2026-11-03，本轮落实）：** scripts/evaluate_submission.py委托外接direct_project_eval.py，从队伍实际cwd、解释器/环境和模型配置运行；清单接受合法宿主/相对路径。直接正式模式与旧诊断区分，不伪造镜像身份；指挥部固定SDK/科学源/参考仍核验。交付说明、8页/12页文稿及direct-v1配置同步；两个实际ZIP已用修改过的队伍项目、基础agent和本机脚本化ModelClient，在九真实环境中完成36次合法实验/草稿/交卷动作、固定积分、评分及汇总复算。超时、坏提交、无稿、基础设施故障与限定反馈另经集成测试；尚无真实白名单权重/H200运行证据，不能据此宣称模型部署和能力通过，见7.90及docs/RUN_READINESS_CHECK.txt。
 
@@ -1428,6 +1428,14 @@ Python包预取不等于所有C++/CUDA第三方源码已离线：vLLM的CMake仍
 完整链路检查另发现指挥部直接执行器会对Python路径resolve，Linux虚拟环境bin/python常是符号链接，可能误执行基础解释器。已改为保留绝对解释器路径而不展开其符号链接；科学数据、规律、噪声、计分和配额不改。新的direct-v1-r2配置与交付仅同步执行代码摘要及组件，旧配置和归档保留。技术说明见docs/INSTALL_RECOVERY_CUDA128.txt；实际测试与交付数量按本轮最终验收报告记录，未执行真实远端安装、GPU或外部API调用。
 
 验收与发布：公开回归224通过/4平台跳过、正式执行相关私有集成42通过/3平台跳过、资料库36通过（Windows使用UTF-8模式）；本机HTTP测试真实复现镜像404后下载恢复。固定外层安装提交b185d07ee0d2a805dee439434e4cbe4de6861908，安装器原字节SHA为9a3bb1de7759bbe5c29ddd29fda4fb26863c3a19fad0c8ba379a4eabed3d2f5a；实际匿名下载外层及六组件全部核验通过。starter-v6为72文件，runtime-direct-v1-r2为110文件，两模型测试包r9为145/146文件；32份当前/历史ZIP校验及r8安全刷新检查通过。实际新ZIP解压后在九真实模拟器用脚本化模型服务完成36动作、law/claims、固定积分和独立复算，未加载真实模型；107项保护科学/参考/PDF/PPT文件保持，旧包原字节保留。完整安装器含命题仓库定位，只作为命题人主项目入口，不直接塞入参赛包；参赛包提供完整bootstrap及三个匹配助手，保持原公开边界。
+
+### 7.93 新实例Triton镜像断连与多行错误漏判（2026-11-03）
+
+用户已确认当前为新实例，旧/opt环境可能未保留，安装命令须先激活discoverphy。最初--resume因缺Conda工具链记录停止，改为首次安装后本次日志已到4/7第348行，说明前面的工具链和匹配组件准备已完成；因此当前同一实例恢复可用--resume，不能把这个结论跨实例套用。discoverphy是入口环境，实验与推理仍使用固定双环境，不删除旧文件。
+
+当前失败为triton==3.6.0的cp312/Linux x86_64 wheel从内网镜像下载时RemoteDisconnected，pip提示connection-failed。官方PyPI存在同名文件，不能由此判断Triton、Torch或CUDA版本冲突。本次确有v2代码遗漏：逐行同时要求镜像hostname、error/warning和原因；新版pip将这几项拆为多行，未触发官方回退。已按精确目标主机识别Failed to connect to这一独立错误行，继续拒绝编译、冲突、哈希、证书和无关下载错误的回退。新增实际日志形状及约束保持回归，通过13项针对性测试（含既有本机真实404恢复）；公开完整回归227通过/4平台跳过，无真实远端安装、GPU或模型调用。
+
+新助手固定提交2d1a5e4668e87ed5df960b9ccdc5c6b217283c8f，pip_index_install.py原始LF SHA为06019da034952e2e8e62fd79f2ff12d35fd7d168fb7a65af467e093ddfa658d7。外层换用v3助手目录，避免旧v2保护机制拒绝新SHA；其他工具链/双Python环境路径保留。本次恢复建议整套安装器直接指定官方PyPI，保留Torch/cu128等版本约束，不仅手补Triton，不关闭依赖检查或重新创建全部环境。具体激活、拉取和恢复命令已写入docs/INSTALL_RECOVERY_CUDA128.txt。用户实例能否实际连接官方源及完成编译，仍以运行日志和最终成功凭据为准。
 
 ## 8. 当前仓库的可复用部分与已确认缺口
 
