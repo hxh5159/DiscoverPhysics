@@ -85,7 +85,7 @@
     "candidate_timeout_seconds": 120,
     "shutdown_seconds": 30,
     "exploration_wall_clock_seconds": 600,
-    "profile": "direct-v1",
+    "profile": "direct-v1-r2",
     "semantics": "启动、候选执行和关闭为运行护栏，不改变从首次mission起的600秒探索"
   }
 }
