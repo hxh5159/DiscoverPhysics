@@ -140,6 +140,43 @@ class BootstrapCuda128PathsTests(unittest.TestCase):
         self.assertFalse(target.exists())
         self.assert_no_tools()
 
+    def test_torch_install_uses_verified_local_wheel_or_existing_version(self) -> None:
+        source = SCRIPT.read_text(encoding='utf-8').split(
+            '# BEGIN TORCH_WHEEL_SELECTION\n', 1)[1].split('# END TORCH_WHEEL_SELECTION', 1)[0]
+        for installed in (False, True):
+            with self.subTest(installed=installed):
+                root = self.base / ('installed' if installed else 'missing')
+                python = root / 'model/bin/python'
+                python.parent.mkdir(parents=True)
+                calls = root / 'pip-arguments.txt'
+                python.write_text(
+                    '#!/usr/bin/env bash\n'
+                    'if [ "$1" = -I ]; then exit ' + ('0' if installed else '1') + '; fi\n'
+                    'test "$2" = --output-dir || exit 91\n'
+                    'mkdir -p "$3"\n'
+                    'touch "$3/torch-2.11.0+cu128-cp312-cp312-manylinux_2_28_x86_64.whl"\n',
+                    encoding='utf-8', newline='\n')
+                python.chmod(0o755)
+                program = '\n'.join((
+                    'ENV_ROOT=' + shlex.quote(shell_path(root)),
+                    'MODEL_ENV=' + shlex.quote(shell_path(root / 'model')),
+                    'TORCH_PREPARE=prepare_torch_wheel.py',
+                    'CONSTRAINTS=constraints-cu128.txt',
+                    'pip_install() { printf "%s\\n" "$@" > ' + shlex.quote(shell_path(calls)) + '; }',
+                    source))
+                result = subprocess.run([self.bash, '-euc', program], capture_output=True,
+                    text=True, encoding='utf-8', errors='replace', timeout=20)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                arguments = calls.read_text(encoding='utf-8').splitlines()
+                if installed:
+                    self.assertIn('torch==2.11.0+cu128', arguments)
+                    self.assertFalse((root / 'wheelhouse').exists())
+                else:
+                    self.assertNotIn('torch==2.11.0+cu128', arguments)
+                    self.assertIn(shell_path(root / 'wheelhouse' / 'torch-2.11.0+cu128-cp312-cp312-manylinux_2_28_x86_64.whl'), arguments)
+                self.assertIn('torchvision==0.26.0+cu128', arguments)
+                self.assertIn('torchaudio==2.11.0+cu128', arguments)
+
     def test_unknown_cpu_build_target_is_rejected_without_tools(self) -> None:
         self.assert_rejected("--env-root", shell_path(self.base / "invalid-target"),
                              "--cpu-build-for", "unknown", "--plan")

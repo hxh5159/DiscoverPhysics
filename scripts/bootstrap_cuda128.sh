@@ -14,6 +14,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 PIP_HELPER="$SCRIPT_DIR/pip_index_install.py"
 CUDA_PREFLIGHT="$SCRIPT_DIR/preflight_cuda128_build.py"
 DEPENDENCY_PREFLIGHT="$SCRIPT_DIR/prepare_vllm_dependencies.py"
+TORCH_PREPARE="$SCRIPT_DIR/prepare_torch_wheel.py"
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
 usage() {
     printf '%s\n' \
@@ -96,7 +97,7 @@ if [ "$PLAN" -eq 1 ]; then
 fi
 [ -n "$INDEX_URL" ] && [ -n "$TRUSTED_HOST" ] || die '--index-url and --trusted-host are required for installation.'
 [ "$(uname -s)" = Linux ] && [ "$(uname -m)" = x86_64 ] || die 'This profile requires Linux x86_64.'
-for helper in "$PIP_HELPER" "$CUDA_PREFLIGHT" "$DEPENDENCY_PREFLIGHT"; do
+for helper in "$PIP_HELPER" "$CUDA_PREFLIGHT" "$DEPENDENCY_PREFLIGHT" "$TORCH_PREPARE"; do
     [ -f "$helper" ] || die "Missing matching installer helper: $helper; use the complete install_all_dependencies.sh entry."
 done
 for executable in git curl getconf readlink; do
@@ -310,11 +311,21 @@ mkdir -p -- "$FETCHCONTENT_BASE_DIR"
 printf '%s\n' 'Packages use your supplied index; official PyTorch/PyPI links and public GitHub build sources also require network access.'
 pip_install "$TRIAL_ENV/bin/python" 'numpy==2.1.3' 'scipy==1.15.3' 'pytest>=8,<9'
 pip_install "$MODEL_ENV/bin/python" --upgrade pip
+# BEGIN TORCH_WHEEL_SELECTION
+TORCH_REQUIREMENT='torch==2.11.0+cu128'
+if ! "$MODEL_ENV/bin/python" -I -c 'import importlib.metadata as m; assert m.version("torch")=="2.11.0+cu128"' >/dev/null 2>&1; then
+    printf '\n[SHORE] Persist the exact Torch wheel and verify its SHA256 before installation.\n'
+    "$MODEL_ENV/bin/python" "$TORCH_PREPARE" --output-dir "$ENV_ROOT/wheelhouse"
+    TORCH_REQUIREMENT="$ENV_ROOT/wheelhouse/torch-2.11.0+cu128-cp312-cp312-manylinux_2_28_x86_64.whl"
+else
+    printf '\n[SHORE] Reuse the installed torch2.11.0+cu128; no Torch wheel download requested.\n'
+fi
 pip_install "$MODEL_ENV/bin/python" -c "$CONSTRAINTS" \
     --find-links https://download.pytorch.org/whl/cu128/torch/ \
     --find-links https://download.pytorch.org/whl/cu128/torchvision/ \
     --find-links https://download.pytorch.org/whl/cu128/torchaudio/ \
-    'torch==2.11.0+cu128' 'torchvision==0.26.0+cu128' 'torchaudio==2.11.0+cu128'
+    "$TORCH_REQUIREMENT" 'torchvision==0.26.0+cu128' 'torchaudio==2.11.0+cu128'
+# END TORCH_WHEEL_SELECTION
 if [ "$CPU_BUILD_FOR" = h200 ]; then
     "$MODEL_ENV/bin/python" - <<'PY'
 import torch

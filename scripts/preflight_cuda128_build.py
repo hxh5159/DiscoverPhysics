@@ -117,6 +117,9 @@ def _bracket(value: str) -> str:
 
 def cmake_source(module_dir: str) -> str:
     return '''cmake_minimum_required(VERSION 3.26.1)
+# Script mode does not run project()'s configuration initialization. PyTorch's
+# vendored FindCUDA calls cmake_initialize_per_config_variable unconditionally.
+include(CMakeInitializeConfigs)
 list(PREPEND CMAKE_MODULE_PATH MODULE_DIR)
 set(CMAKE_SIZEOF_VOID_P 8)
 set(CUDA_USE_STATIC_CUDA_RUNTIME OFF)
@@ -185,7 +188,12 @@ def run_preflight(python: str | Path, cuda_home: str | Path, output: str | Path,
         (directory / (name + ".stdout.log")).write_text(done.stdout or "", encoding="utf-8")
         (directory / (name + ".stderr.log")).write_text(done.stderr or "", encoding="utf-8")
         if done.returncode:
-            raise PreflightError(f"{name} failed with exit code {done.returncode}; see {directory}")
+            # Keep the full logs, but also expose the actual diagnostic in the
+            # report: an exit code alone cannot distinguish a script defect
+            # from missing toolchain files on the remote CPU builder.
+            diagnostic = (done.stderr or done.stdout or "").strip()
+            detail = "\n" + diagnostic[-4096:] if diagnostic else ""
+            raise PreflightError(f"{name} failed with exit code {done.returncode}; see {directory}{detail}")
         report["checks"].append({"name": name, "passed": True})
         return done.stdout or ""
 

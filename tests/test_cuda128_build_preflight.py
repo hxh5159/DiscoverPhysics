@@ -3,6 +3,8 @@ from pathlib import Path
 import importlib.util
 import json
 import os
+import re
+import shutil
 import subprocess
 import sys
 
@@ -119,6 +121,7 @@ def test_failure_preserves_stage_logs_and_stops_following_steps(tmp_path, stage)
     result = preflight.run_preflight(root / "bin/python", root, tmp_path / "diagnostics",
                                     root / "bin/gcc", root / "bin/g++", runner=runner)
     assert result["status"] == "failed" and result["failed_stage"] == stage
+    assert "synthetic build failure" in result["error"]
     assert Path(result["report_path"]).is_file()
     assert "synthetic build failure" in (Path(result["diagnostic_directory"]) / (stage + ".stderr.log")).read_text()
     if stage != "nvcc_compile_only":
@@ -181,3 +184,59 @@ def test_help_is_side_effect_free_and_does_not_import_torch(tmp_path):
     assert process.returncode == 0
     assert "--cuda-home" in process.stdout
     assert not list(tmp_path.iterdir())
+
+
+def real_cmake_executable():
+    """Use an explicitly supplied/PATH CMake, without downloading test tools."""
+    executable = os.environ.get("SHORE_TEST_CMAKE") or shutil.which("cmake")
+    if not executable:
+        pytest.skip("Real CMake is not installed; set SHORE_TEST_CMAKE to run this regression")
+    version = subprocess.run([executable, "--version"], capture_output=True, text=True,
+                             encoding="utf-8", errors="replace", timeout=15)
+    match = re.search(r"cmake version (\d+)\.(\d+)", version.stdout)
+    if version.returncode or not match or tuple(map(int, match.groups())) < (3, 26):
+        pytest.skip("The real CMake regression requires CMake >=3.26")
+    return executable
+
+
+@pytest.mark.parametrize("missing_header", [False, True])
+def test_real_cmake_script_initialization_and_header_validation(tmp_path, missing_header):
+    """Run real CMake; the FindCUDA fixture isolates its required initializer.
+
+    This is not a CUDA/nvcc simulation advertised as real toolchain discovery:
+    it tests the script-mode initialization contract that FakeRunner cannot.
+    """
+    executable = real_cmake_executable()
+    root, include, _, _ = fixture(tmp_path)
+    found = preflight.layout(root)
+    modules = tmp_path / "cmake-modules"
+    modules.mkdir()
+    (modules / "FindCUDA.cmake").write_text(
+        'cmake_initialize_per_config_variable(CUDA_NVCC_FLAGS "Probe configuration")\n'
+        'set(CUDA_VERSION_STRING "12.8")\n'
+        'set(CUDA_INCLUDE_DIRS "${CUDA_TOOLKIT_INCLUDE}")\n',
+        encoding="utf-8")
+    source = tmp_path / "find-cuda.cmake"
+    generated = preflight.cmake_source(str(modules))
+    flags = preflight.cmake_command(sys.executable, found, source)[3:]
+    command = [executable, *flags]
+    # The previous generated script fails in the real interpreter even though
+    # all file fixtures are present; this is the reported initialization bug.
+    source.write_text(generated.replace("include(CMakeInitializeConfigs)\n", ""), encoding="utf-8")
+    before = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True,
+                            encoding="utf-8", errors="replace", timeout=30)
+    assert before.returncode != 0
+    assert 'Unknown CMake command "cmake_initialize_per_config_variable"' in before.stderr
+
+    if missing_header:
+        (include / "device_functions.h").unlink()
+    source.write_text(generated, encoding="utf-8")
+    after = subprocess.run(command, cwd=tmp_path, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=30)
+    assert 'Unknown CMake command "cmake_initialize_per_config_variable"' not in after.stderr
+    if missing_header:
+        assert after.returncode != 0
+        assert "CUDA include/runtime detection did not match the checked toolkit" in after.stderr
+    else:
+        assert after.returncode == 0, after.stdout + after.stderr
+        assert "SHORE_FINDCUDA_OK=12.8;" in after.stdout
