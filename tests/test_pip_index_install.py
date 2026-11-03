@@ -19,6 +19,15 @@ from scripts.pip_index_install import install, mirror_download_failed
 
 
 MIRROR = "http://mirror.example/simple"
+TRITON_DISCONNECT = """Collecting triton==3.6.0 (from torch==2.11.0+cu128)
+  WARNING: Retrying (Retry(total=0, connect=None, read=None, redirect=None, status=None)) after connection broken by 'RemoteDisconnected('Remote end closed connection without response')': /repository/pypi/packages/triton/3.6.0/triton-3.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+error: connection-failed
+
+× Failed to connect to mirror.example while fetching http://mirror.example/repository/pypi/packages/triton/3.6.0/triton-3.6.0-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+╰─> the connection was closed without a reply from the server.
+
+hint: Are you connected to the Internet? If so, check whether your system can connect to mirror.example before trying again. There may be a firewall or proxy that's preventing the connection.
+"""
 
 
 class Runner:
@@ -71,6 +80,36 @@ class PipIndexTests(unittest.TestCase):
         for text in ("ERROR: 502 Server Error for url: http://mirror.example/packages/a.whl",
                      "WARNING: Retrying after connection broken by HTTPConnectionPool(host='mirror.example'): Read timed out"):
             self.assertTrue(mirror_download_failed(text,MIRROR),text)
+    def test_modern_pip_multiline_triton_disconnect_is_recognized(self):
+        # Same output shape as the reported failure; only the mirror host is anonymized.
+        self.assertTrue(mirror_download_failed(TRITON_DISCONNECT,MIRROR))
+    def test_multiline_connection_failure_retries_official_once_without_changing_pins(self):
+        flags = ['-c','constraints-cu128.txt',
+                 '--find-links','https://download.pytorch.org/whl/cu128/torch/',
+                 'torch==2.11.0+cu128','triton==3.6.0']
+        runner = Runner([(1,TRITON_DISCONNECT),(0,'success')])
+        self.assertEqual(self.run_install(runner,flags),0)
+        self.assertEqual(len(runner.calls),2)
+        for command,_ in runner.calls:
+            self.assertEqual(command[4:4+len(flags)],flags)
+            self.assertNotIn('--extra-index-url',command)
+        command = runner.calls[1][0]
+        self.assertEqual(command[command.index('--index-url')+1],'https://pypi.org/simple')
+        receipt = json.loads(next(self.root.glob('pip-index-*/receipt.json')).read_text(encoding='utf-8'))
+        self.assertTrue(receipt['fallback_used'])
+        self.assertEqual([item['exit_code'] for item in receipt['attempts']],[1,0])
+    def test_modern_connection_errors_require_the_mirror_as_the_exact_target(self):
+        for host in ('github.com','mirror.example.evil','notmirror.example'):
+            message = ('Looking in indexes: '+MIRROR+'\n'+
+                       TRITON_DISCONNECT.replace('mirror.example',host))
+            with self.subTest(host=host):
+                self.assertFalse(mirror_download_failed(message,MIRROR))
+        for failure in ('CMake Error: missing CUDA',
+                        'ERROR: THESE PACKAGES DO NOT MATCH THE HASHES',
+                        'error: hash-mismatch',
+                        'ERROR: CERTIFICATE_VERIFY_FAILED'):
+            with self.subTest(failure=failure):
+                self.assertFalse(mirror_download_failed(TRITON_DISCONNECT+'\n'+failure,MIRROR))
     def test_dependency_compiler_hash_and_unrelated_network_errors_do_not_fallback(self):
         messages = [
             "ERROR: ResolutionImpossible: dependencies conflict. http://mirror.example/simple",

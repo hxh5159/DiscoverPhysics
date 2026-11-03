@@ -46,12 +46,20 @@ def mirror_download_failed(output: str, index_url: str) -> bool:
     lowered = output.lower()
     if any(marker in lowered for marker in _BUILD_FAILURES):
         return False
-    if "certificate_verify_failed" in lowered or "hashes do not match" in lowered:
+    if any(marker in lowered for marker in (
+            "certificate_verify_failed", "certificate verify failed",
+            "hashes do not match", "do not match the hashes", "error: hash-mismatch")):
         return False
     hostname = urlsplit(index_url).hostname.lower()
     for line in lowered.splitlines():
         if hostname not in line:
             continue
+        # Recent pip versions put ``error: connection-failed`` on one line,
+        # ``Failed to connect to <host> while fetching ...`` on the next, and
+        # the socket reason below it. The target on this line is sufficient:
+        # do not combine an earlier mirror URL with an unrelated host's error.
+        if re.search(r"\bfailed to connect to\s+" + re.escape(hostname) + r"(?=$|[\s:/])", line):
+            return True
         if not any(marker in line for marker in ("error", "warning: retrying", "could not fetch url")):
             continue
         if re.search(r"(?:http(?:s)?(?: error)?[ :]+|status(?: code)?[ :=]+|\b)(404|408|429|500|502|503|504)\b", line):
