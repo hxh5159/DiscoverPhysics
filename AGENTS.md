@@ -1481,6 +1481,8 @@ preflight补include(CMakeInitializeConfigs)，失败JSON带最多4096字符的�
 
 一键安装入口已发布到固定提交6e567d306693ea5b64757ceb97b2d3a41f55e83b，原字节22774，SHA256为eb7db5bc3199e6857ebfa6a6c775073391c16932e1cdd6021feea75f961e7fef。外层及七助手均已实际匿名下载并验SHA通过；远端只需下载校验后替换项目scripts/install_all_dependencies.sh，新入口自动写入v5匹配助手，不手工混改旧/opt脚本。给出的恢复命令先激活discoverphy，保留旧入口备份；工具链仍完整时使用--resume。
 
+用户随后给出的真实v5日志确认Python包索引已切至指定nexus，实验环境NumPy/SciPy/pytest正常复用，Torch解析因当前索引无可用匹配候选而报ResolutionImpossible，并按镜像策略停止。报错中的请求torch==2.11.0+cu128与同值constraint本身不冲突；不能把它误诊为两套版本约束不同。尚需查询镜像可见版本/兼容性，不能仅凭该输出断言整个镜像完全没有torch或已完成安装。不得据此擅自去掉+cu128、换CUDA或恢复官方源；pip索引通常仅镜像PyPI，PyTorch专用cu128制品是否被同步需实际核对。当前尚无用户实例完整Torch/vLLM安装成功证据。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
