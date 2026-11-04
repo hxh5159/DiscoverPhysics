@@ -1479,6 +1479,8 @@ preflight补include(CMakeInitializeConfigs)，失败JSON带最多4096字符的�
 
 公开回归253通过、4项平台跳过，包含真实CMake初始化及2项真实pip本机HTTP索引测试，验证缺精确版本不访问第二源、继承PIP_FIND_LINKS/PIP_NO_INDEX不能绕过源选择；不是访问用户内网镜像或真实安装Torch/vLLM的证据。交付更新为starter-v9、运行安装v5和模型测试r12，共73/111/146/147文件；44份归档SHA/CRC、124项科学/SDK/profile/参考/PDF保护与四类旧包实际刷新保护通过，资料库36项检查通过。未运行新的科学模拟、真实模型、GPU或外部模型API；用户PPT及FILE_GUIDE的在途修改不提交。
 
+一键安装入口已发布到固定提交6e567d306693ea5b64757ceb97b2d3a41f55e83b，原字节22774，SHA256为eb7db5bc3199e6857ebfa6a6c775073391c16932e1cdd6021feea75f961e7fef。外层及七助手均已实际匿名下载并验SHA通过；远端只需下载校验后替换项目scripts/install_all_dependencies.sh，新入口自动写入v5匹配助手，不手工混改旧/opt脚本。给出的恢复命令先激活discoverphy，保留旧入口备份；工具链仍完整时使用--resume。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
