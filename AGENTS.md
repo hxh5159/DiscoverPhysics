@@ -1483,6 +1483,16 @@ preflight补include(CMakeInitializeConfigs)，失败JSON带最多4096字符的�
 
 用户随后给出的真实v5日志确认Python包索引已切至指定nexus，实验环境NumPy/SciPy/pytest正常复用，Torch解析因当前索引无可用匹配候选而报ResolutionImpossible，并按镜像策略停止。报错中的请求torch==2.11.0+cu128与同值constraint本身不冲突；不能把它误诊为两套版本约束不同。尚需查询镜像可见版本/兼容性，不能仅凭该输出断言整个镜像完全没有torch或已完成安装。不得据此擅自去掉+cu128、换CUDA或恢复官方源；pip索引通常仅镜像PyPI，PyTorch专用cu128制品是否被同步需实际核对。当前尚无用户实例完整Torch/vLLM安装成功证据。
 
+### 7.97 CUDA13.0候选路线：先核对内部镜像依赖，不就地替换（2026-11-04）
+
+用户实际查询nexus索引返回普通torch2.11.0/vision0.26.0/audio2.11.0，但没有所需+cu128候选。用户选择“评估改用CUDA13.0：先检查内部镜像能否提供完整兼容依赖，再调整安装方案”。这是允许评估新的cu130路线，不是证明新环境已安装或允许未经核对就地覆盖12.8环境。当前已发布一键入口仍为v5/cu128；如未来切换，应使用独立环境并清理继承的cu128工具链变量，保留原环境和下载文件。
+
+实际读取官方PyPI的JSON元数据：普通torch2.11.0的Python3.12/Linux x86_64 wheel依赖cuda-toolkit13.0.2和cuda-bindings13.x；vLLM0.24.0有cp38-abi3/manylinux2_28/x86_64预编译wheel，要求Torch2.11、vision0.26、audio2.11、FlashInfer0.6.12，Transformers5.8可继续锁定。vLLM该tag的envs.py默认CUDA13.0，Dockerfile为13.0.2；部分安装文档旧cu129表述不能替代tag源码与实际wheel信息。若镜像具备兼容二进制包，可避免vLLM本体的源码CMake构建，但不代表运行时JIT无需工具或内核资源。
+
+两个额外核对项：vLLM0.24官方Dockerfile针对共享路径覆盖，在安装后重装匹配版本nvidia-cutlass-dsl-libs-cu13（DSL4.5.2）；迁移时须处理而非只删旧约束后缀。flashinfer-python和flashinfer-cubin0.6.12存在于普通PyPI，但flashinfer-jit-cache0.6.12+cu130仅在其专用索引，普通PyPI返回404，内部镜像是否同步必须单独查询；切到cu130不能据此保证所有离线资源都可从内部镜像获取。完整包解析和二进制可用性待用户在内网实例预检，后续GPU/真实模型验收独立进行。
+
+给出的预检应只用指定内部索引、精确普通版本、不含+cu128或+cu130伪后缀；以当前Python3.12执行pip --dry-run --ignore-installed --only-binary=:all: --report，不更改已装环境、不初始化GPU。该操作不安装，但镜像若缺PEP658元数据，pip仍可能下载wheel读取元数据，不能声称绝不下载大包。已知旧H200驱动595.58.03符合CUDA13.x驱动要求，但新实例实际驱动仍须另查，不用nvidia-smi的13.2标签代替真实Toolkit或Torch运行库检查。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
