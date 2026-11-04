@@ -15,8 +15,10 @@ bootstrap_cuda128.sh只安装环境，不下载模型、不启动推理或实验
 vLLM采用源码构建，是为了与已有CUDA12.8/Torch cu128匹配；不使用默认CUDA13 wheel。
 源码包由Python包索引获取，不再克隆vLLM仓库。构建仍可能通过git下载公开第三方源码，
 因此需要网络；不需要GitHub账号。GIT_TERMINAL_PROMPT=0避免登录提示阻塞。
-普通Python依赖使用调用方指定的索引，Torch cu128与vLLM源码另允许官方链接。
-这不是纯内网/离线安装；安装包和编译源码的远端可用性仍需实际执行验证。
+当前默认--mirror-only：Torch/vision/audio、vLLM源码包及其他Python依赖仅使用指定包索引，
+不附加官方wheel链接，不自动回退PyPI。镜像缺少精确cu128包时停止，不能删除+cu128改装默认版。
+Conda工具链、uv的Python发行包、CMake源码与非pip内核资源仍有独立网络来源；
+“仅指定Python包索引”不表示全部安装网络只经过该镜像。
 
 一、前置条件
 Linux x86_64、glibc>=2.28、同节点已分配的四张可见GPU、git、curl、GCC/G++11.3至14，
@@ -35,9 +37,10 @@ bash scripts/bootstrap_cuda128.sh \
 
 参数--env-root不要求包含项目或私有包，可与已有测试包共用目录。
 配套组件为pip_index_install.py、preflight_cuda128_build.py、prepare_vllm_dependencies.py；
-另须配齐prepare_torch_wheel.py，缺失Torch时先持久化续传精确wheel并核对官方SHA。
+另须配齐prepare_torch_wheel.py；默认镜像模式不调用它，旧wheelhouse/.part原样保留。
 安装前检查Torch FindCUDA与小型CUDA对象编译，之后预下载并核验缺失Python依赖。
-指定镜像下载404或连接失败时，仅单次切换官方PyPI重新解析，不混合索引；
+指定镜像缺包或下载失败时保留日志并停止，不混合索引或自行更换CUDA版本；
+只有明确传入--allow-official-fallback才恢复旧的官方下载及回退行为。
 实际源码构建仍可能下载公开C++/CUDA第三方源码，不属于pip离线档案范围。
 只创建/复用.venv-trial和.venv-vllm-cu128，不删除旧.venv-vllm、日志、结果或缓存。
 目标父目录必须存在；非环境文件、未完成环境及用户自写的激活脚本会被保护并明确报错。

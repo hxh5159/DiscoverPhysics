@@ -84,7 +84,15 @@ class FullInstallerOfflineTests(unittest.TestCase):
                                 text=True, encoding='utf-8', errors='replace', timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('--resume', result.stdout)
-        self.assertIn('/opt/shore-image-tools-v4', result.stdout)
+        self.assertIn('/opt/shore-image-tools-v5', result.stdout)
+        self.assertIn('--mirror-only', result.stdout)
+
+    def test_default_plan_uses_single_index_and_legacy_requires_explicit_flag(self):
+        for extra, expected in (([], '1'), (['--allow-official-fallback'], '0')):
+            result = subprocess.run([self.bash, shell_path(SCRIPT), '--plan', *extra],
+                capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=20)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('仅指定Python包索引：' + expected, result.stdout)
 
 
 if __name__ == '__main__':

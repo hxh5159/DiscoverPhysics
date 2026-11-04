@@ -4,15 +4,17 @@ CUDA12.8/H200完整安装与恢复（2026-11-04）
 已有工具链且上次停在pip/vLLM阶段时加--resume，跳过Conda重新求解，保留已有环境。
 首次安装省略--resume。镜像/实例保存复制由使用者自行负责，不属于安装或测评协议。
 
-安装器版本标识：2026-11-04.persistent-torch-cmake-v4。
-默认辅助脚本目录为/opt/shore-image-tools-v4，保留旧v2/v3与/opt/shore-image-tools。
+安装器版本标识：2026-11-04.internal-mirror-v5。
+默认辅助脚本目录为/opt/shore-image-tools-v5，保留旧v2/v3/v4与/opt/shore-image-tools。
 Python环境和CUDA工具链仍是/opt/shore-h200-cu128及/opt/shore-h200-toolchain。
 
 当前恢复重点：目标解释器报No module named torch，说明当前环境尚无可导入Torch。
 已有成功导入记录不能替代当前实例的实际结果，实例/环境是否变化需按日志核对。
-v4在Torch未安装时先用curl持久化下载固定wheel到环境根wheelhouse，使用.part跨次续传；
-只有文件大小与官方SHA均通过才改为.whl并交给pip。精确版本已安装时不再请求大wheel。
-这能避免后续重跑从零下载，不能保证当前实例的外网带宽变快；旧pip临时79MB不自动迁移。
+v5默认--mirror-only：Torch/vision/audio、vLLM源码包及其他Python依赖只使用指定索引，
+不调用官方Torch下载器、不添加官方wheel链接、不自动回退官方PyPI。
+仍锁定Torch2.11.0+cu128/vision0.26.0+cu128/audio2.11.0+cu128，不用删掉+cu128的办法换版本。
+镜像缺少兼容Python3.12/Linux x86_64的精确包时停止并保留日志，需要镜像端补齐相应制品。
+旧wheelhouse/.part原样保留，默认镜像模式不继续使用它；pip下载不保证跨进程接管旧片段。
 应先停止旧安装进程再启动新安装器，避免并发修改同一环境。
 原Torch FindCUDA预检补齐CMakeInitializeConfigs初始化，并有真实CMake回归；
 该回归验证CMake脚本，不等于真实Linux CUDA编译、vLLM或模型推理已通过。
@@ -21,7 +23,7 @@ v4在Torch未安装时先用curl持久化下载固定wheel到环境根wheelhouse
   bash scripts/install_all_dependencies.sh --resume \
     --index-url "$SHORE_PIP_MIRROR" --trusted-host "$SHORE_PIP_MIRROR_HOST"
 
-当前Triton镜像断连恢复（已经到阶段4，工具链已完成；在同一可联网实例执行）：
+内部镜像安装/恢复（已经到阶段4，工具链已完成；在同一可联网实例执行）：
 
   SHORE_CONDA_BASE="$(conda info --base)" &&
   source "$SHORE_CONDA_BASE/etc/profile.d/conda.sh" &&
@@ -30,17 +32,18 @@ v4在Torch未安装时先用curl持久化下载固定wheel到环境根wheelhouse
   git pull --ff-only &&
   bash scripts/install_all_dependencies.sh \
     --resume --conda-exe "$SHORE_CONDA_BASE/bin/conda" \
-    --index-url 'https://pypi.org/simple' --trusted-host 'pypi.org'
+    --mirror-only \
+    --index-url 'http://nexus.sii.shaipower.online/repository/pypi/simple' \
+    --trusted-host 'nexus.sii.shaipower.online'
 
-本次恢复直连官方索引；不手动降级Triton，不删除现有环境，不重新求解已有工具链。
+本次Python包仅使用内部镜像；不手动降级Triton，不删除现有环境，不重新求解已有工具链。
 同版本且已经满足约束的包继续复用；未完成下载的包可能需要重新下载。
 若又换成没有工具链的新实例，应省略--resume，而不是从旧实例记录推断环境仍存在。
 
 SHORE_PIP_MIRROR和SHORE_PIP_MIRROR_HOST使用平台提供的内网pip地址。
-如果内网镜像在Triton下载时反复主动断开，可仅为本次安装将index-url改成
-https://pypi.org/simple、trusted-host改成pypi.org；Torch/cu128等版本约束不变。
-新版识别pip的多行Failed to connect to <镜像主机>错误并触发备用索引。
-旧v2只按同一行查域名和原因，可能漏掉这类错误，不应反复运行旧助手。
+内部镜像断连/404/缺包时默认不切换来源，需要检查镜像服务或由平台补齐对应制品。
+只有使用者主动添加--allow-official-fallback才恢复旧的官方Torch链接及PyPI回退，
+这不属于当前默认安装命令；该选项同样不能改变Torch/cu128等固定版本约束。
 也可下载此脚本的已发布固定版本后执行；脚本内部按固定Git提交和SHA获取匹配组件，
 不需要为了安装环境先克隆项目。不要继续使用之前固定旧提交的下载链接。
 
@@ -54,9 +57,10 @@ https://pypi.org/simple、trusted-host改成pypi.org；Torch/cu128等版本约�
 6. 安装FlashInfer0.6.12/cu128配套资源，下载官方cubin并校验完整清单。
 7. 两环境pip check、固定主版本、编译扩展摘要、离线资源全部通过后才写成功凭据。
 
-下载处理：优先平台镜像，只有明确镜像包下载404/网络失败才单次切换官方PyPI；
-不混合extra-index，不放开Torch/CUDA约束，不将编译失败或版本冲突伪装成镜像问题。
-依赖预取如果遇到坏直链，会从官方重新解析新URL，不反复请求同一失效地址。
+下载处理：Python包索引仅指定镜像，清除继承的pip配置/额外索引/外部find-links；
+不放开Torch/CUDA约束，不将编译失败或版本冲突伪装成镜像问题。
+Conda工具链、uv的Python发行包、CMake第三方源码与FlashInfer非pip内核资源仍由其服务提供；
+仅指定包索引不等于所有网络仅访问内部镜像。实际档案链接由镜像提供，未额外封锁镜像合法CDN。
 OpenAI包只是vLLM的协议依赖，不会因此调用外部模型或使用API key；约束在2.x族用于
 限制无界主版本漂移，并非已经证明3.x必然不兼容。
 

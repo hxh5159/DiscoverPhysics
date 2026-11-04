@@ -9,7 +9,7 @@ umask 077
 
 ENV_ROOT='/opt/shore-h200-cu128'
 TOOL_ROOT='/opt/shore-h200-toolchain'
-SCRIPT_ROOT='/opt/shore-image-tools-v4'
+SCRIPT_ROOT='/opt/shore-image-tools-v5'
 INDEX_URL="${SHORE_PIP_MIRROR:-}"
 TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 CONDA_BIN="${CONDA_EXE:-}"
@@ -17,10 +17,11 @@ JOBS="${SHORE_BUILD_JOBS:-2}"
 PLAN=0
 CHECK_ONLY=0
 RESUME=0
-INSTALLER_VERSION='2026-11-04.persistent-torch-cmake-v4'
+MIRROR_ONLY=1
+INSTALLER_VERSION='2026-11-04.internal-mirror-v5'
 PHASE='参数检查'
 LOG_FILE=''
-SOURCE_REF='66950e93eed55241469fc30587f45a24ad86fea1'
+SOURCE_REF='31754aa5e1b7ffb39388c6a3c46d28e0c3624609'
 
 die() { printf 'ERROR [%s]: %s\n' "$PHASE" "$*" >&2; exit 2; }
 stage() { PHASE="$1"; printf '\n========== %s ==========\n' "$PHASE"; }
@@ -43,14 +44,19 @@ Usage:
 Options:
   --env-root PATH     Python environments/cache root (default /opt/shore-h200-cu128)
   --tool-root PATH    Conda CUDA/compiler toolchain (default /opt/shore-h200-toolchain)
-  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v4)
+  --scripts-dir PATH  Verified environment helpers (default /opt/shore-image-tools-v5)
   --conda-exe PATH    Existing Conda executable; otherwise discover CONDA_EXE/PATH
   --jobs NUMBER       CPU build jobs (default SHORE_BUILD_JOBS or 2)
   --plan              Print the complete installation plan; no filesystem/network changes
   --check             Check installed packages/cache locally; no installation or GPU calls
   --resume            Reuse the existing CUDA12.8/GCC12 toolchain instead of resolving Conda again
+  --mirror-only       Use only the specified Python package index (default)
+  --allow-official-fallback  Explicitly restore the legacy official wheel links/fallbacks
 
 The index may also be supplied by SHORE_PIP_MIRROR/SHORE_PIP_MIRROR_HOST.
+By default Torch/vision/audio, vLLM and other Python packages use only that
+index. Missing exact CUDA12.8 artifacts stop installation; no version is changed.
+Conda/managed Python, build sources and non-pip kernel assets use their own services.
 Installs Python3.12, NumPy2.1.3, SciPy1.15.3, pytest, CUDA Toolkit12.8.1,
 GCC/G++12, PyTorch2.11.0+cu128, torchvision/torchaudio0.26/2.11,
 vLLM0.24.0 from source, Transformers5.8.0 and resolved dependencies,
@@ -81,6 +87,8 @@ while [ "$#" -gt 0 ]; do
         --plan) PLAN=1; shift ;;
         --check) CHECK_ONLY=1; shift ;;
         --resume) RESUME=1; shift ;;
+        --mirror-only) MIRROR_ONLY=1; shift ;;
+        --allow-official-fallback) MIRROR_ONLY=0; shift ;;
         --help|-h) usage; exit 0 ;;
         *) die "未知选项：$1；使用--help查看用法。" ;;
     esac
@@ -111,12 +119,14 @@ if [ "$PLAN" -eq 1 ]; then
         '3. 检查或安装uv，创建实验和推理两套Python3.12环境。' \
         '4. 安装NumPy/SciPy/pytest以及PyTorch2.11+cu128。' \
         '5. 安装构建依赖，从源码编译vLLM0.24，安装Transformers5.8及其依赖。' \
-        '   编译前真实检查CUDA、预下载并校验全部缺失依赖；镜像下载失败时单次官方源回退。' \
+        '   默认仅使用指定Python包索引：Torch/vision/audio、vLLM及依赖不添加官方链接、不自动回退。' \
+        '   精确cu128包缺失时停止；Conda工具链、Python发行包及源码/非pip内核资源另行下载。' \
         '6. 下载并校验FlashInfer0.6.12/cu128离线推理资源。' \
         '7. 检查两环境版本、pip依赖、CPU计算、构建清单和离线文件完整性。' \
         "实验Python：$TRIAL_PY" "推理Python：$MODEL_PY" \
         "工具链：$TOOL_ROOT" "检查脚本：$SCRIPT_ROOT" \
         '无需项目共享盘或GPU；不下载模型、不修改宿主驱动/容器服务。'
+    printf '仅指定Python包索引：%s（1=启用，0=已明确允许官方回退）\n' "$MIRROR_ONLY"
     exit 0
 fi
 
@@ -160,7 +170,7 @@ verify_all() {
     [ -x "$MODEL_PY" ] || die "推理环境不存在或不可执行：$MODEL_PY"
     [ -f "$ENV_ROOT/activate_h200_offline.sh" ] || die '缺少H200离线激活文件。'
     [ -f "$SCRIPT_ROOT/prepare_h200_offline_cache.py" ] || die '缺少离线资源校验脚本。'
-    printf '%s  %s\n' 86989fe2f96c40284280c4d3d8e094dadafccf6646082617d65d41f1a9d449f1 \
+    printf '%s  %s\n' 3e477776da03f20963f147e21870e19f4e3f6a6a649eafcc1a8afda173946cdf \
         "$SCRIPT_ROOT/prepare_h200_offline_cache.py" | sha256sum -c -
     # Preserve the CUDA12.8/compiler runtime libraries; never use Toolkit stubs.
     local directory inherited
@@ -336,29 +346,33 @@ fetch_helper() {
     fi
     mv -- "$temporary" "$target"
 }
-fetch_helper bootstrap_cuda128.sh 79f550a133418e50998fc92f462aee655a55b5e05e3aca3b40f90de2c88fdabc
-fetch_helper prepare_h200_offline_cache.py 86989fe2f96c40284280c4d3d8e094dadafccf6646082617d65d41f1a9d449f1
+fetch_helper bootstrap_cuda128.sh 8cf1bb179b74853adf4325ed33990bad01d67bf2daede47a3bb444a786508860
+fetch_helper prepare_h200_offline_cache.py 3e477776da03f20963f147e21870e19f4e3f6a6a649eafcc1a8afda173946cdf
 fetch_helper verify_h200_cuda128.py 5a1ebc8e5fbe1fc726701a8748f53e665ee05854befadccf334cad2ebae1ffc8
-fetch_helper pip_index_install.py 06019da034952e2e8e62fd79f2ff12d35fd7d168fb7a65af467e093ddfa658d7
+fetch_helper pip_index_install.py 9a64ef326012a1c374f0601833f9a28f01c1e5d7aabf18b7a359a6dfe3d5a671
 fetch_helper preflight_cuda128_build.py 4d2855ff709a3d57b8cc5f12993c5b38d6b256cc16222a245caa91c8dfdd45b0
-fetch_helper prepare_vllm_dependencies.py 75b99561007ef14ef37fefb7bc13c405764725e9657a694717a015c070d21372
+fetch_helper prepare_vllm_dependencies.py 4e91032aec3f59c89a7176685921144368dc1c16e1daa4b6e9f81c99e62e6771
 fetch_helper prepare_torch_wheel.py c76933e29f01461295397c79166638451b40c341a82c1a74ba9b2441bd3ec954
 
 stage '4/7 安装uv/Python3.12、NumPy/SciPy、PyTorch和vLLM/Transformers'
 printf '%s\n' '此阶段会真实执行pip安装及vLLM源码编译；首次安装可能耗时较长，输出持续写入日志。'
+PACKAGE_SOURCE_ARGS=(--allow-official-fallback)
+if [ "$MIRROR_ONLY" -eq 1 ]; then PACKAGE_SOURCE_ARGS=(--mirror-only); fi
 bash "$SCRIPT_ROOT/bootstrap_cuda128.sh" \
     --cpu-build-for h200 --env-root "$ENV_ROOT" \
-    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST"
+    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" "${PACKAGE_SOURCE_ARGS[@]}"
 
 stage '5/7 安装并下载FlashInfer/cu128离线内核资源'
+OFFLINE_SOURCE_ARGS=()
+if [ "$MIRROR_ONLY" -eq 1 ]; then OFFLINE_SOURCE_ARGS=(--mirror-only); fi
 "$TRIAL_PY" "$SCRIPT_ROOT/prepare_h200_offline_cache.py" --env-root "$ENV_ROOT" \
-    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST"
+    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" "${OFFLINE_SOURCE_ARGS[@]}"
 
 stage '6/7 检查两套环境版本、pip依赖和离线文件'
 verify_all
 
 stage '7/7 写入本次成功凭据'
-"$TRIAL_PY" - "$ENV_ROOT" "$MODEL_PY" "$TOOL_ROOT" "$SCRIPT_ROOT" "$LOG_FILE" "$SOURCE_REF" "$INSTALLER_VERSION" <<'PY'
+"$TRIAL_PY" - "$ENV_ROOT" "$MODEL_PY" "$TOOL_ROOT" "$SCRIPT_ROOT" "$LOG_FILE" "$SOURCE_REF" "$INSTALLER_VERSION" "$MIRROR_ONLY" "$INDEX_URL" <<'PY'
 import importlib.metadata as md
 import json
 from datetime import datetime, timezone
@@ -366,7 +380,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-root, model_python, tool_root, script_root, log_file, revision, installer_version = sys.argv[1:]
+root, model_python, tool_root, script_root, log_file, revision, installer_version, mirror_only, index_url = sys.argv[1:]
 code = 'import importlib.metadata as m,json;print(json.dumps({n:m.version(n) for n in ("torch","vllm","transformers","flashinfer-python","flashinfer-jit-cache")}))'
 model = json.loads(subprocess.check_output([model_python, '-c', code], text=True))
 receipt = {
@@ -378,6 +392,7 @@ receipt = {
     'model_versions': model, 'tool_root': tool_root, 'script_root': script_root,
     'helper_source_revision': revision, 'log': log_file,
     'installer_version': installer_version,
+    'python_package_source': {'index_url': index_url, 'mirror_only': mirror_only == '1'},
     'gpu_or_model_execution_performed': False,
 }
 path = Path(root) / 'install-all-dependencies-success.json'

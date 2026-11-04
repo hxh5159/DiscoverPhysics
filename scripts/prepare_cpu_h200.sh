@@ -7,13 +7,14 @@ umask 077
 BASE='/inspire/hdd/project/26-the-other-shore/fengkairui-25026'
 ENVROOT='/opt/shore-h200-cu128'
 TOOLROOT='/opt/shore-h200-toolchain'
-SCRIPTS='/opt/shore-image-tools'
+SCRIPTS='/opt/shore-image-tools-v5'
 INDEX_URL="${SHORE_PIP_MIRROR:-}"
 TRUSTED_HOST="${SHORE_PIP_MIRROR_HOST:-}"
 PLAN=0
 DEPENDENCIES_ONLY=0
+MIRROR_ONLY=1
 # These independent environment helpers share a fixed, previously published revision.
-DEPENDENCY_SOURCE_REF='66950e93eed55241469fc30587f45a24ad86fea1'
+DEPENDENCY_SOURCE_REF='31754aa5e1b7ffb39388c6a3c46d28e0c3624609'
 PHASE='解析参数'
 
 die() { printf 'ERROR: %s\n' "$*" >&2; exit 2; }
@@ -31,6 +32,7 @@ usage() {
     printf '%s\n' \
         'Usage: bash prepare_cpu_h200.sh --index-url URL --trusted-host HOST' \
         '       [--dependencies-only] [--base-dir /absolute/project/directory] [--plan]' \
+        '       [--mirror-only | --allow-official-fallback] (default: mirror-only)' \
         '--dependencies-only installs under /opt without accessing project/model paths or test bundles.' \
         'The default base contains sibling DiscoverPhysics and test repositories.' \
         'Mirror values may also come from SHORE_PIP_MIRROR/SHORE_PIP_MIRROR_HOST.' \
@@ -51,6 +53,8 @@ while [ "$#" -gt 0 ]; do
             shift 2 ;;
         --plan) PLAN=1; shift ;;
         --dependencies-only) DEPENDENCIES_ONLY=1; shift ;;
+        --mirror-only) MIRROR_ONLY=1; shift ;;
+        --allow-official-fallback) MIRROR_ONLY=0; shift ;;
         --help|-h) usage; exit 0 ;;
         *) die "未知选项：$1；使用--help查看用法。" ;;
     esac
@@ -217,14 +221,18 @@ fi
 
 stage '5/7 安装实验依赖并从源码构建H200推理环境'
 if [ "$DEPENDENCIES_ONLY" -eq 1 ]; then cd "$SCRIPTS"; else cd "$PROJECT"; fi
+PACKAGE_SOURCE_ARGS=(--allow-official-fallback)
+if [ "$MIRROR_ONLY" -eq 1 ]; then PACKAGE_SOURCE_ARGS=(--mirror-only); fi
 bash "$SCRIPTS/bootstrap_cuda128.sh" \
     --cpu-build-for h200 --env-root "$ENVROOT" \
-    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST"
+    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" "${PACKAGE_SOURCE_ARGS[@]}"
 
 stage '6/7 下载并校验离线内核资源'
 PY="$ENVROOT/.venv-trial/bin/python"
+OFFLINE_SOURCE_ARGS=()
+if [ "$MIRROR_ONLY" -eq 1 ]; then OFFLINE_SOURCE_ARGS=(--mirror-only); fi
 "$PY" "$SCRIPTS/prepare_h200_offline_cache.py" --env-root "$ENVROOT" \
-    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST"
+    --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" "${OFFLINE_SOURCE_ARGS[@]}"
 "$PY" "$SCRIPTS/prepare_h200_offline_cache.py" --env-root "$ENVROOT" --verify
 
 stage '7/7 检查CPU准备结果'

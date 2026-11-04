@@ -8,7 +8,7 @@ H200实例只做本地验收和推理，不执行pip/conda/git或联网下载。
 环境与编译工具建议放在镜像会保存的/opt目录，示例：
   /opt/shore-h200-cu128         双Python环境、Python解释器、缓存及构建清单
   /opt/shore-h200-toolchain     CUDA12.8、GCC/G++12、git、curl、make
-  /opt/shore-image-tools-v4    七份匹配的安装/准备/检查组件
+  /opt/shore-image-tools-v5    七份匹配的安装/准备/检查组件（旧v4保留）
 在平台保存镜像前确认这些路径属于会打包的文件系统。
 /inspire/...共享盘的项目与模型在H200实例中另行挂载；不能默认挂载盘会随镜像复制。
 镜像部署后保持相同绝对路径，不仅复制venv目录。
@@ -25,9 +25,10 @@ export CXX=/opt/shore-h200-toolchain/bin/x86_64-conda-linux-gnu-g++
 export PATH="$SHORE_CUDA128_HOME/bin:$HOME/.local/bin:$PATH"
 export SHORE_BUILD_JOBS=2
 
-bash /opt/shore-image-tools-v4/bootstrap_cuda128.sh \
+bash /opt/shore-image-tools-v5/bootstrap_cuda128.sh \
   --cpu-build-for h200 --env-root /opt/shore-h200-cu128 \
-  --index-url '<用户指定的PyPI索引URL>' --trusted-host '<对应主机名>'
+  --index-url 'http://nexus.sii.shaipower.online/repository/pypi/simple' \
+  --trusted-host 'nexus.sii.shaipower.online' --mirror-only
 
 该模式强制VLLM_TARGET_DEVICE=cuda、TORCH_CUDA_ARCH_LIST=9.0。
 通用内核以SM90编译，专用Hopper内核按vLLM自身规则使用SM90a。
@@ -39,14 +40,16 @@ bash /opt/shore-image-tools-v4/bootstrap_cuda128.sh \
 三、CPU实例：下载离线内核
 安装完成后执行：
 
-python3 /opt/shore-image-tools-v4/prepare_h200_offline_cache.py \
+python3 /opt/shore-image-tools-v5/prepare_h200_offline_cache.py \
   --env-root /opt/shore-h200-cu128 \
-  --index-url '<用户指定的PyPI索引URL>' --trusted-host '<对应主机名>'
+  --index-url 'http://nexus.sii.shaipower.online/repository/pypi/simple' \
+  --trusted-host 'nexus.sii.shaipower.online' --mirror-only
 
-python3 /opt/shore-image-tools-v4/prepare_h200_offline_cache.py \
+python3 /opt/shore-image-tools-v5/prepare_h200_offline_cache.py \
   --env-root /opt/shore-h200-cu128 --verify
 
-工具按官方cu128索引安装flashinfer-jit-cache0.6.12+cu128，下载同版cubin，
+工具仅按指定镜像安装flashinfer-jit-cache0.6.12+cu128，缺少精确包时停止，不添加官方wheel源。
+同版cubin属于独立非pip资源，仍需访问其官方服务；
 核对官方注册表及本地文件，生成offline-kernel-cache.json。
 flashinfer-cubin已安装时其包内目录优先于自定义CUBIN_DIR，清单记录实际路径。
 不要使用旧0.32说明中的vllm download-kernels；0.24没有这个CLI命令。
@@ -61,7 +64,7 @@ Toolkit的stub库可用于链接，不得加入运行LD_LIBRARY_PATH；真实驱
 先确认平台已分配四张完整H200并挂载项目/模型共享盘，再执行：
 
 source /opt/shore-h200-cu128/activate_h200_offline.sh
-python3 /opt/shore-image-tools-v4/verify_h200_cuda128.py \
+python3 /opt/shore-image-tools-v5/verify_h200_cuda128.py \
   --env-root /opt/shore-h200-cu128
 
 激活文件固定本地缓存，开启HF离线与FlashInfer禁止下载；保留本地JIT能力。

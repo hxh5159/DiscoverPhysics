@@ -80,7 +80,7 @@ def test_download_hash_mismatch_keeps_part_and_never_publishes(tmp_path):
     with pytest.raises(DownloadError, match='SHA'): run(tmp_path, FakeCurl([(0, corrupted, '200')]))
     assert (tmp_path/(NAME + '.part')).read_bytes() == corrupted
     assert not (tmp_path/NAME).exists()
-    receipt = json.loads(next(tmp_path.glob('torch-wheel-download-*.json')).read_text())
+    receipt = json.loads(next(tmp_path.glob('torch-wheel-download-*.json')).read_text(encoding='utf-8'))
     assert receipt['status'] == 'failed'
 
 
