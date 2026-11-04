@@ -10,6 +10,7 @@ INDEX_URL=''
 TRUSTED_HOST=''
 PLAN=0
 CPU_BUILD_FOR=''
+MIRROR_ONLY=1
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 PIP_HELPER="$SCRIPT_DIR/pip_index_install.py"
 CUDA_PREFLIGHT="$SCRIPT_DIR/preflight_cuda128_build.py"
@@ -20,6 +21,7 @@ usage() {
     printf '%s\n' \
         'Usage: bash bootstrap_cuda128.sh --env-root /existing/parent/target' \
         '       --index-url URL --trusted-host HOST [--cpu-build-for h200] [--plan]' \
+        '       [--mirror-only | --allow-official-fallback] (default: mirror-only)' \
         'The target may already exist; its parent must exist. --plan is offline.' \
         'Optional: SHORE_CUDA128_HOME, CC, CXX, SHORE_BUILD_JOBS (default 4, CPU build 2).'
 }
@@ -35,6 +37,8 @@ while [ "$#" -gt 0 ]; do
             esac
             shift 2 ;;
         --plan) PLAN=1; shift ;;
+        --mirror-only) MIRROR_ONLY=1; shift ;;
+        --allow-official-fallback) MIRROR_ONLY=0; shift ;;
         --help|-h) usage; exit 0 ;;
         *) die "Unknown argument: $1" ;;
     esac
@@ -85,7 +89,8 @@ if [ "$PLAN" -eq 1 ]; then
         'Versions: Python 3.12; NumPy 2.1.3; SciPy 1.15.3; pytest 8.x.' \
         'Model stack: torch 2.11.0+cu128; torchvision 0.26.0+cu128; torchaudio 2.11.0+cu128;' \
         'vLLM 0.24.0 from source; transformers 5.8.0.' \
-        'Actual installation uses the supplied package index plus official PyTorch/PyPI source links.' \
+        'Default: only the supplied Python package index; exact CUDA12.8 packages remain pinned.' \
+        'Official Torch/PyPI source links are used only with --allow-official-fallback.' \
         'Compilation may fetch public GitHub sources; GitHub login is not required.' \
         'Plan only: no directories created, installation, network, GPU, or model calls.'
     if [ "$CPU_BUILD_FOR" = h200 ]; then
@@ -195,9 +200,11 @@ fi
 pip_install() {
     local interpreter="$1"
     shift
+    local -a source_args=()
+    if [ "$MIRROR_ONLY" -eq 1 ]; then source_args+=(--mirror-only); fi
     "$interpreter" "$PIP_HELPER" --python "$interpreter" \
         --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" \
-        --log-dir "$ENV_ROOT/pip-logs" -- "$@"
+        --log-dir "$ENV_ROOT/pip-logs" "${source_args[@]}" -- "$@"
 }
 if ! command -v uv >/dev/null; then
     BOOTSTRAP_PYTHON="$(command -v python3 || command -v python)" || die 'Install Python with pip, or uv, before retrying.'
@@ -308,10 +315,22 @@ export FETCHCONTENT_BASE_DIR="$ENV_ROOT/.cache/vllm-fetch"
 case "$FETCHCONTENT_BASE_DIR" in *[[:space:]]*) die 'The build cache path must not contain whitespace for the vLLM CMAKE_ARGS interface.' ;; esac
 export CMAKE_ARGS="${CMAKE_ARGS:-} -DFETCHCONTENT_BASE_DIR:PATH=$FETCHCONTENT_BASE_DIR"
 mkdir -p -- "$FETCHCONTENT_BASE_DIR"
-printf '%s\n' 'Packages use your supplied index; official PyTorch/PyPI links and public GitHub build sources also require network access.'
+if [ "$MIRROR_ONLY" -eq 1 ]; then
+    printf '%s\n' 'Python package index: specified mirror only; no official Torch downloader, extra wheel links or PyPI fallback.'
+    printf '%s\n' 'Conda, managed Python, CMake build sources and non-pip FlashInfer assets are separate network resources.'
+else
+    printf '%s\n' 'Official fallback explicitly enabled; official PyTorch/PyPI links and public GitHub build sources require network access.'
+fi
 pip_install "$TRIAL_ENV/bin/python" 'numpy==2.1.3' 'scipy==1.15.3' 'pytest>=8,<9'
 pip_install "$MODEL_ENV/bin/python" --upgrade pip
 # BEGIN TORCH_WHEEL_SELECTION
+if [ "$MIRROR_ONLY" -eq 1 ]; then
+    printf '\n[SHORE] Install exact CUDA12.8 Torch/vision/audio from the specified mirror only.\n'
+    if ! pip_install "$MODEL_ENV/bin/python" -c "$CONSTRAINTS" --only-binary=:all: \
+        'torch==2.11.0+cu128' 'torchvision==0.26.0+cu128' 'torchaudio==2.11.0+cu128'; then
+        die 'Mirror-only Torch installation failed. Inspect the pip log: the mirror must provide Python3.12/Linux x86_64 compatible torch2.11.0+cu128, torchvision0.26.0+cu128 and torchaudio2.11.0+cu128. Network failures and missing artifacts require mirror/platform repair; no CUDA version was substituted or official Torch downloader invoked. Existing wheelhouse/.part files were preserved.'
+    fi
+else
 TORCH_REQUIREMENT='torch==2.11.0+cu128'
 if ! "$MODEL_ENV/bin/python" -I -c 'import importlib.metadata as m; assert m.version("torch")=="2.11.0+cu128"' >/dev/null 2>&1; then
     printf '\n[SHORE] Persist the exact Torch wheel and verify its SHA256 before installation.\n'
@@ -325,6 +344,7 @@ pip_install "$MODEL_ENV/bin/python" -c "$CONSTRAINTS" \
     --find-links https://download.pytorch.org/whl/cu128/torchvision/ \
     --find-links https://download.pytorch.org/whl/cu128/torchaudio/ \
     "$TORCH_REQUIREMENT" 'torchvision==0.26.0+cu128' 'torchaudio==2.11.0+cu128'
+fi
 # END TORCH_WHEEL_SELECTION
 if [ "$CPU_BUILD_FOR" = h200 ]; then
     "$MODEL_ENV/bin/python" - <<'PY'
@@ -360,19 +380,23 @@ printf '\n[SHORE] Check CUDA detection and compile a tiny object on the CPU buil
     --cuda-home "$CUDA_HOME" --cc "$CC" --cxx "$CXX" --output "$LOG_ROOT/cuda-preflight"
 printf '\n[SHORE] Resolve and download every missing dependency before the expensive vLLM build.\n'
 DEPENDENCY_ROOT="$LOG_ROOT/dependency-preflight"
+DEPENDENCY_SOURCE_ARGS=()
+if [ "$MIRROR_ONLY" -eq 1 ]; then DEPENDENCY_SOURCE_ARGS+=(--mirror-only); fi
 "$MODEL_ENV/bin/python" "$DEPENDENCY_PREFLIGHT" --python "$MODEL_ENV/bin/python" \
     --index-url "$INDEX_URL" --trusted-host "$TRUSTED_HOST" \
-    --constraints "$CONSTRAINTS" --output "$DEPENDENCY_ROOT"
+    --constraints "$CONSTRAINTS" --output "$DEPENDENCY_ROOT" "${DEPENDENCY_SOURCE_ARGS[@]}"
 WHEELHOUSE="$("$MODEL_ENV/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["wheelhouse"])' "$DEPENDENCY_ROOT/prepared.json")"
 RESOLVED_CONSTRAINTS="$("$MODEL_ENV/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["resolved_constraints"])' "$DEPENDENCY_ROOT/prepared.json")"
 RUNTIME_REQUIREMENTS="$("$MODEL_ENV/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["runtime_requirements"])' "$DEPENDENCY_ROOT/prepared.json")"
 printf '\n[SHORE] Install verified runtime dependencies before compiling vLLM.\n'
-env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
+env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL -u PIP_FIND_LINKS -u PIP_NO_INDEX \
+    -u PIP_TRUSTED_HOST PIP_CONFIG_FILE=/dev/null \
     "$MODEL_ENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" \
     --constraint "$CONSTRAINTS" --constraint "$RESOLVED_CONSTRAINTS" \
     --no-build-isolation --no-cache-dir --requirement "$RUNTIME_REQUIREMENTS"
 printf '\n[SHORE] Compile and install vLLM using the verified local dependency artifacts.\n'
-env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
+env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL -u PIP_FIND_LINKS -u PIP_NO_INDEX \
+    -u PIP_TRUSTED_HOST PIP_CONFIG_FILE=/dev/null \
     "$MODEL_ENV/bin/python" -m pip install --no-index --find-links "$WHEELHOUSE" \
     --constraint "$CONSTRAINTS" --constraint "$RESOLVED_CONSTRAINTS" \
     --no-binary=vllm --no-build-isolation --no-cache-dir \

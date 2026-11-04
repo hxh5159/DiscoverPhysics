@@ -32,9 +32,10 @@ class FakePipeline:
         self.mirror_download_failure=mirror_download_failure
         self.resolution_failure=resolution_failure
         self.corrupt=corrupt
-    def __call__(self,python,args,*,index_url,trusted_host,log_dir,fallback_index_url,operation):
+    def __call__(self,python,args,*,index_url,trusted_host,log_dir,fallback_index_url,operation,
+                 mirror_only=False):
         self.calls.append({'python':python,'args':list(args),'index':index_url,'operation':operation,
-                           'fallback':fallback_index_url})
+                           'fallback':fallback_index_url,'mirror_only':mirror_only})
         folder=Path(log_dir)/'pip-index-fixture';folder.mkdir(parents=True)
         if operation=='install':
             if self.resolution_failure and index_url==MIRROR:
@@ -62,9 +63,10 @@ class PrepareDependenciesTests(unittest.TestCase):
         self.root=Path(self.tmp.name)
         self.constraints=self.root/'constraints.txt'
         self.constraints.write_text('torch==2.11.0+cu128\ntransformers==5.8.0\n',encoding='utf-8')
-    def run_prepare(self,runner,*,output=None,python=None):
+    def run_prepare(self,runner,*,output=None,python=None,mirror_only=False):
         return prepare(python or sys.executable,index_url=MIRROR,trusted_host='mirror.example',
-            constraints=self.constraints,output=output or self.root/'new-output',pip_runner=runner)
+            constraints=self.constraints,output=output or self.root/'new-output',pip_runner=runner,
+            mirror_only=mirror_only)
     def test_only_reported_missing_archives_are_downloaded_and_verified(self):
         runner=FakePipeline([[record('vllm','0.24.0')]])
         result=self.run_prepare(runner)
@@ -90,6 +92,29 @@ class PrepareDependenciesTests(unittest.TestCase):
         self.assertEqual(len(runner.calls),1)
         self.assertEqual(result['archive_count'],0)
         self.assertTrue(Path(result['wheelhouse']).is_dir())
+    def test_mirror_only_omits_official_links_and_preserves_hash_checks(self):
+        runner=FakePipeline([[record('vllm','0.24.0')]])
+        result=self.run_prepare(runner,mirror_only=True)
+        self.assertTrue(result['mirror_only'])
+        self.assertTrue(result['all_archive_sha256_verified'])
+        self.assertFalse(result['fallback_used'])
+        self.assertEqual(result['archive_count'],1)
+        self.assertTrue(all(c['mirror_only'] and c['index']==MIRROR and c['fallback']=='' for c in runner.calls))
+        self.assertNotIn('--find-links',runner.calls[0]['args'])
+        self.assertIn('--require-hashes',runner.calls[1]['args'])
+    def test_mirror_only_missing_source_does_not_resolve_officially(self):
+        runner=FakePipeline([],resolution_failure='ERROR: HTTP error 404 at http://mirror.example/packages/a.tar.gz')
+        with self.assertRaisesRegex(RuntimeError,'mirror-only mode will not use another index'):
+            self.run_prepare(runner,mirror_only=True)
+        self.assertEqual(len(runner.calls),1)
+        failure=json.loads((self.root/'new-output/failure.json').read_text(encoding='utf-8'))
+        self.assertTrue(failure['mirror_only'])
+    def test_mirror_only_broken_archive_does_not_select_new_official_urls(self):
+        runner=FakePipeline([[record()]],mirror_download_failure=True)
+        with self.assertRaisesRegex(RuntimeError,'archive download failed'):
+            self.run_prepare(runner,mirror_only=True)
+        self.assertEqual([c['index'] for c in runner.calls],[MIRROR,MIRROR])
+        self.assertFalse((self.root/'new-output/prepared.json').exists())
     def test_broken_mirror_archive_triggers_official_fresh_resolution(self):
         runner=FakePipeline([[record()], [record(version='1.1.0',host='files.pythonhosted.org')]],mirror_download_failure=True)
         result=self.run_prepare(runner)

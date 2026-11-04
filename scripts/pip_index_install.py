@@ -1,8 +1,8 @@
 """Prefer the configured pip mirror and explicitly retry download failures once.
 
-This stdlib-only helper never combines indexes. The caller's constraints,
-official wheel links and build flags are preserved verbatim on both attempts.
-Compiler and dependency-resolution errors are not retried against another index.
+This stdlib-only helper never combines indexes. The optional mirror-only mode
+uses only the supplied package index, without an official fallback or remote
+find-links. Compiler and dependency-resolution errors are never retried.
 """
 from __future__ import annotations
 
@@ -112,7 +112,8 @@ def _tail(path):
 
 
 def install(python, requirements_args, *, index_url, trusted_host, log_dir,
-            fallback_index_url="https://pypi.org/simple", operation="install", runner=None):
+            fallback_index_url="https://pypi.org/simple", operation="install", runner=None,
+            mirror_only=False):
     """Run pip and return its status; ``runner(cmd, env=..., log_path=...)`` is injectable.
 
     An injected runner must write the attempt log and return an integer status.
@@ -121,7 +122,7 @@ def install(python, requirements_args, *, index_url, trusted_host, log_dir,
     if operation not in ("install", "download"):
         raise ValueError("operation must be install or download")
     primary = _index(index_url)
-    fallback = _index(fallback_index_url) if fallback_index_url else None
+    fallback = _index(fallback_index_url) if fallback_index_url and not mirror_only else None
     arguments = list(requirements_args)
     if not python or not arguments:
         raise ValueError("An interpreter and pip requirement arguments are required")
@@ -131,11 +132,25 @@ def install(python, requirements_args, *, index_url, trusted_host, log_dir,
         if (argument == "-i" or argument.startswith("-i=") or
                 any(argument == flag or argument.startswith(flag+"=") for flag in _INDEX_ARGUMENTS)):
             raise ValueError("Pass package indexes through the helper, never through extra pip arguments")
+    if mirror_only:
+        for number, argument in enumerate(arguments):
+            link = None
+            if argument in ("--find-links", "-f") and number + 1 < len(arguments):
+                link = arguments[number + 1]
+            elif argument.startswith("--find-links="):
+                link = argument.split("=", 1)[1]
+            elif argument.startswith("-f") and not argument.startswith("--") and len(argument) > 2:
+                link = argument[2:]
+            if link is not None and urlsplit(link).scheme in ("http", "https"):
+                raise ValueError("Mirror-only mode does not accept remote --find-links; use the configured index")
     if not trusted_host or any(c.isspace() for c in trusted_host):
         raise ValueError("One explicit trusted-host value is required")
     environment = os.environ.copy()
     environment.pop("PIP_INDEX_URL", None)
     environment.pop("PIP_EXTRA_INDEX_URL", None)
+    if mirror_only:
+        environment.pop("PIP_FIND_LINKS", None)
+        environment.pop("PIP_NO_INDEX", None)
     # os.devnull is /dev/null on the target Linux instance (nul on Windows QA).
     environment["PIP_CONFIG_FILE"] = os.devnull
     root = Path(log_dir).expanduser().resolve()
@@ -143,7 +158,7 @@ def install(python, requirements_args, *, index_url, trusted_host, log_dir,
     run = Path(tempfile.mkdtemp(prefix="pip-index-", dir=root))
     attempt_runner = runner or _stream_attempt
     receipt = {"operation": operation, "requirements_args": arguments, "attempts": [],
-               "fallback_used": False, "indexes_combined": False}
+               "fallback_used": False, "indexes_combined": False, "mirror_only": bool(mirror_only)}
     indexes = [primary]
     if fallback and fallback != primary:
         indexes.append(fallback)
@@ -169,6 +184,9 @@ def install(python, requirements_args, *, index_url, trusted_host, log_dir,
     receipt["exit_code"] = code
     (run/"receipt.json").write_text(json.dumps(receipt, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
     print("[SHORE pip] Attempt logs: " + str(run), flush=True)
+    if code and mirror_only:
+        print("[SHORE pip] Mirror-only mode: stopped without another package index. "
+              "Check that this mirror contains the exact requested versions and CUDA variants.", flush=True)
     return code
 
 
@@ -179,6 +197,8 @@ def main(argv=None):
     parser.add_argument("--trusted-host", required=True)
     parser.add_argument("--log-dir", required=True, type=Path)
     parser.add_argument("--fallback-index-url", default="https://pypi.org/simple")
+    parser.add_argument("--mirror-only", action="store_true",
+                        help="Use only the configured index; disable fallback and remote find-links")
     parser.add_argument("--operation", choices=("install", "download"), default="install")
     parser.add_argument("requirements_args", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -187,7 +207,8 @@ def main(argv=None):
         requirements = requirements[1:]
     try:
         return install(args.python, requirements, index_url=args.index_url, trusted_host=args.trusted_host,
-            log_dir=args.log_dir, fallback_index_url=args.fallback_index_url, operation=args.operation)
+            log_dir=args.log_dir, fallback_index_url=args.fallback_index_url, operation=args.operation,
+            mirror_only=args.mirror_only)
     except (OSError, ValueError, RuntimeError) as exc:
         print("[SHORE pip] " + str(exc), file=sys.stderr)
         return 2

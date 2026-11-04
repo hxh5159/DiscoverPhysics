@@ -83,7 +83,8 @@ def test_cpu_download_environment_does_not_modify_parent(monkeypatch, tmp_path):
     assert cache.os.environ["FLASHINFER_NO_DOWNLOAD"] == "1"
 
 
-def test_prepare_uses_exact_official_wheel_and_preserves_build_fields(tmp_path):
+@pytest.mark.parametrize('mirror_only', [False, True])
+def test_prepare_uses_exact_official_wheel_and_preserves_build_fields(tmp_path, mirror_only):
     root, build, fixture = fixture_tree(tmp_path)
     binary = root / ".venv-vllm-cu128" / "bin"
     binary.mkdir(parents=True)
@@ -103,11 +104,14 @@ def test_prepare_uses_exact_official_wheel_and_preserves_build_fields(tmp_path):
             patch.object(cache.platform, "machine", return_value="x86_64"), \
             patch.object(cache, "run_json", side_effect=[versions, probe]), \
             patch.object(cache.subprocess, "run", side_effect=inspect_commands) as run:
-        result = cache.prepare(root, build, "http://mirror.invalid/simple", "mirror.invalid")
+        result = cache.prepare(root, build, "http://mirror.invalid/simple", "mirror.invalid",
+                               mirror_only=mirror_only)
     assert result["status"] == "prepared"
     pip = run.call_args_list[0].args[0]
     assert "flashinfer-jit-cache==0.6.12+cu128" in pip
-    assert cache.OFFICIAL_JIT_LINKS in pip
+    assert (cache.OFFICIAL_JIT_LINKS in pip) is (not mirror_only)
+    assert ('--mirror-only' in pip) is mirror_only
+    assert ('--find-links' in pip) is (not mirror_only)
     assert "--no-deps" not in pip
     assert str(cache.Path(cache.__file__).with_name("pip_index_install.py")) in pip
     assert "--index-url" in pip and "--trusted-host" in pip
@@ -121,6 +125,34 @@ def test_prepare_uses_exact_official_wheel_and_preserves_build_fields(tmp_path):
     assert saved["offline_cache_prepared"] is True
     assert saved["offline_cache_manifest"] == cache.MANIFEST_NAME
     assert cache.verify_manifest(root, cache.load_json(root / cache.MANIFEST_NAME))["files"] == 2
+    saved_manifest=cache.load_json(root / cache.MANIFEST_NAME)
+    assert saved_manifest['mirror_only'] is mirror_only
+    assert saved_manifest['package_index'] == 'http://mirror.invalid/simple'
+
+
+def test_mirror_only_missing_exact_cache_stops_before_artifact_download(tmp_path, capsys):
+    root, build, _ = fixture_tree(tmp_path)
+    binary=root/'.venv-vllm-cu128'/'bin';binary.mkdir(parents=True)
+    for name in ('python','flashinfer'):
+        (binary/name).write_bytes(b'placeholder')
+    versions={'flashinfer-python':'0.6.12','flashinfer-cubin':'0.6.12',
+              'torch':'2.11.0+cu128','vllm':'0.24.0','transformers':'5.8.0'}
+    with patch.object(cache.platform,'system',return_value='Linux'), \
+            patch.object(cache.platform,'machine',return_value='x86_64'), \
+            patch.object(cache,'run_json',return_value=versions), \
+            patch.object(cache.subprocess,'run',side_effect=cache.subprocess.CalledProcessError(1,'pip')) as run:
+        with pytest.raises(cache.subprocess.CalledProcessError):
+            cache.prepare(root,build,'http://mirror.invalid/simple','mirror.invalid',mirror_only=True)
+    assert run.call_count == 1
+    command=run.call_args.args[0]
+    assert '--mirror-only' in command
+    assert cache.OFFICIAL_JIT_LINKS not in command
+    assert '--find-links' not in command
+    assert not list(root.glob('.flashinfer-constraints-*'))
+    assert not (root/cache.MANIFEST_NAME).exists()
+    message=capsys.readouterr().err
+    assert 'flashinfer-jit-cache==0.6.12+cu128' in message
+    assert 'no official JIT-cache package link or alternate index was used' in message
 
 
 def test_reject_unfinished_or_other_arch_build(tmp_path):

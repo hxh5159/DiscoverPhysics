@@ -249,7 +249,8 @@ print('SHORE_ASSET_JSON=' + json.dumps({
 '''
 
 
-def prepare(root: Path, build: dict[str, Any], index: str, host: str) -> dict[str, Any]:
+def prepare(root: Path, build: dict[str, Any], index: str, host: str, *,
+            mirror_only: bool = False) -> dict[str, Any]:
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise ValueError("Preparation requires the Linux x86_64 CPU build image.")
     python = root / ".venv-vllm-cu128" / "bin" / "python"
@@ -271,13 +272,25 @@ def prepare(root: Path, build: dict[str, Any], index: str, host: str) -> dict[st
         pip_helper = Path(__file__).with_name("pip_index_install.py")
         if not pip_helper.is_file():
             raise ValueError("Matching pip_index_install.py is missing; use the complete installer helpers.")
-        subprocess.run([
+        command = [
             str(python), str(pip_helper), "--python", str(python),
             "--index-url", index, "--trusted-host", host,
-            "--log-dir", str(root / "pip-logs"), "--operation", "install", "--", "--only-binary=:all:",
-            "--constraint", constraint_name, f"flashinfer-jit-cache=={JIT_CACHE_VERSION}",
-            "--find-links", OFFICIAL_JIT_LINKS,
-        ], env=env, check=True)
+            "--log-dir", str(root / "pip-logs"), "--operation", "install",
+        ]
+        if mirror_only:
+            command.append("--mirror-only")
+        command.extend(["--", "--only-binary=:all:", "--constraint", constraint_name,
+                        f"flashinfer-jit-cache=={JIT_CACHE_VERSION}"])
+        if not mirror_only:
+            command.extend(["--find-links", OFFICIAL_JIT_LINKS])
+        try:
+            subprocess.run(command, env=env, check=True)
+        except subprocess.CalledProcessError:
+            if mirror_only:
+                print("[SHORE offline cache] Mirror-only package installation failed. The configured index "
+                      f"must provide flashinfer-jit-cache=={JIT_CACHE_VERSION} and its dependencies; "
+                      "no official JIT-cache package link or alternate index was used.", file=sys.stderr)
+            raise
         subprocess.run([str(python), "-m", "pip", "check"], env=env, check=True)
     finally:
         if constraint_name is not None:
@@ -298,6 +311,7 @@ def prepare(root: Path, build: dict[str, Any], index: str, host: str) -> dict[st
         **probe, "files": records,
         "unverified": ["GPU initialization", "all runtime shapes", "model loading"],
         "preparation_used_network": True, "verification_uses_network": False,
+        "package_index": index, "mirror_only": bool(mirror_only),
         "gpu_validation_performed": False, "model_loaded": False,
         "notes": [
             "Installed flashinfer-cubin takes precedence over FLASHINFER_CUBIN_DIR in 0.6.12.",
@@ -321,6 +335,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--env-root", type=Path, required=True)
     parser.add_argument("--index-url")
     parser.add_argument("--trusted-host")
+    parser.add_argument("--mirror-only", action="store_true",
+                        help="Install Python packages only from the configured index, without fallback")
     parser.add_argument("--verify", action="store_true",
                         help="Verify recorded files locally; no imports, downloads, GPU or model calls.")
     args = parser.parse_args(argv)
@@ -334,7 +350,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             if not args.index_url or not args.trusted_host:
                 parser.error("Preparation requires --index-url and --trusted-host.")
-            report = prepare(root, build, args.index_url, args.trusted_host)
+            report = prepare(root, build, args.index_url, args.trusted_host, mirror_only=args.mirror_only)
         print(json.dumps(report, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:

@@ -135,6 +135,30 @@ class PipIndexTests(unittest.TestCase):
             runner=Runner([(1,"ERROR: HTTP error 404 at http://mirror.example/a.whl")])
             self.assertEqual(self.run_install(runner,fallback_index_url=fallback),1)
             self.assertEqual(len(runner.calls),1)
+    def test_mirror_only_stops_after_mirror_failure_and_clears_inherited_sources(self):
+        runner=Runner([(1,TRITON_DISCONNECT)])
+        with patch.dict(os.environ, {'PIP_FIND_LINKS':'https://unexpected.example/wheels',
+                                    'PIP_NO_INDEX':'1'}):
+            self.assertEqual(self.run_install(runner,mirror_only=True),1)
+        self.assertEqual(len(runner.calls),1)
+        command,environment=runner.calls[0]
+        self.assertNotIn('PIP_FIND_LINKS',environment)
+        self.assertNotIn('PIP_NO_INDEX',environment)
+        self.assertEqual(command[command.index('--index-url')+1],MIRROR)
+        receipt=json.loads(next(self.root.glob('pip-index-*/receipt.json')).read_text(encoding='utf-8'))
+        self.assertTrue(receipt['mirror_only'])
+        self.assertFalse(receipt['fallback_used'])
+    def test_mirror_only_rejects_remote_find_links_but_accepts_local_wheelhouse(self):
+        for link in (['--find-links','https://download.pytorch.org/whl/cu128/torch/'],
+                     ['--find-links=https://pypi.org/simple/vllm/'],
+                     ['-fhttp://unexpected.example/wheels']):
+            runner=Runner([])
+            with self.subTest(link=link),self.assertRaisesRegex(ValueError,'remote --find-links'):
+                self.run_install(runner,[*link,'fixture==1'],mirror_only=True)
+            self.assertEqual(runner.calls,[])
+        local=self.root/'wheelhouse';local.mkdir()
+        runner=Runner([(0,'local wheelhouse accepted')])
+        self.assertEqual(self.run_install(runner,['--find-links',str(local),'fixture==1'],mirror_only=True),0)
     def test_existing_logs_are_retained(self):
         self.run_install(Runner([(0,"first")]))
         self.run_install(Runner([(0,"second")]))
@@ -150,9 +174,65 @@ class PipIndexTests(unittest.TestCase):
         done=subprocess.run([sys.executable,str(script),"--help"],capture_output=True,text=True,timeout=10)
         self.assertEqual(done.returncode,0)
         self.assertIn("--fallback-index-url",done.stdout)
+        self.assertIn("--mirror-only",done.stdout)
 
 
 class LocalIndexRecoveryTest(unittest.TestCase):
+    def test_real_pip_mirror_only_missing_pin_cannot_use_inherited_links_or_fallback(self):
+        """The mirror has v1, the forbidden source has requested v2; neither installs."""
+        requests=[]
+        def handler(label,version):
+            name=f'shore_mirror_fixture-{version}-py3-none-any.whl'
+            archive=io.BytesIO()
+            with ZipFile(archive,'w',ZIP_DEFLATED) as wheel:
+                wheel.writestr(f'shore_mirror_fixture-{version}.dist-info/METADATA',
+                    f'Metadata-Version: 2.1\nName: shore-mirror-fixture\nVersion: {version}\n')
+                wheel.writestr(f'shore_mirror_fixture-{version}.dist-info/WHEEL',
+                    'Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n')
+                wheel.writestr(f'shore_mirror_fixture-{version}.dist-info/RECORD','')
+            payload=archive.getvalue()
+            digest=hashlib.sha256(payload).hexdigest()
+            class Handler(BaseHTTPRequestHandler):
+                def log_message(self,*args):pass
+                def do_GET(self):
+                    requests.append((label,self.path))
+                    if self.path.rstrip('/') in ('/simple/shore-mirror-fixture','/links'):
+                        data=(f'<a href="/packages/{name}#sha256={digest}">{name}</a>').encode()
+                        self.send_response(200);self.send_header('Content-Type','text/html')
+                    elif self.path=='/packages/'+name:
+                        data=payload;self.send_response(200);self.send_header('Content-Type','application/octet-stream')
+                    else:
+                        self.send_error(404);return
+                    self.send_header('Content-Length',str(len(data)));self.end_headers();self.wfile.write(data)
+            return Handler
+        servers=[ThreadingHTTPServer(('127.0.0.1',0),handler(label,version))
+                 for label,version in (('mirror','1.0.0'),('forbidden','2.0.0'))]
+        threads=[threading.Thread(target=server.serve_forever,daemon=True) for server in servers]
+        for thread in threads:thread.start()
+        try:
+            with tempfile.TemporaryDirectory(prefix='pip-local-mirror-only-') as folder:
+                root=Path(folder)
+                mirror=f'http://127.0.0.1:{servers[0].server_port}/simple'
+                second=f'http://127.0.0.1:{servers[1].server_port}'
+                with patch.dict(os.environ, {'PIP_FIND_LINKS':second+'/links',
+                     'PIP_INDEX_URL':second+'/simple','PIP_EXTRA_INDEX_URL':second+'/simple',
+                     'PIP_NO_INDEX':'1','NO_PROXY':'127.0.0.1','no_proxy':'127.0.0.1'}):
+                    code=install(sys.executable,['--no-deps','--dest',str(root/'wheels'),
+                        'shore-mirror-fixture==2.0.0'],index_url=mirror,trusted_host='127.0.0.1',
+                        fallback_index_url=second+'/simple',operation='download',log_dir=root/'logs',
+                        mirror_only=True)
+                self.assertNotEqual(code,0)
+                self.assertIn(('mirror','/simple/shore-mirror-fixture/'),requests)
+                self.assertFalse(any(label=='forbidden' for label,path in requests),requests)
+                self.assertFalse(list((root/'wheels').glob('*.whl')))
+                receipt=json.loads(next((root/'logs').glob('pip-index-*/receipt.json')).read_text(encoding='utf-8'))
+                self.assertTrue(receipt['mirror_only'])
+                self.assertFalse(receipt['fallback_used'])
+                self.assertEqual(len(receipt['attempts']),1)
+        finally:
+            for server in servers:server.shutdown();server.server_close()
+            for thread in threads:thread.join(timeout=5)
+
     def test_real_pip_download_recovers_from_a_local_bad_artifact_link(self):
         """A tiny invented wheel is downloaded, never installed; no external access."""
         archive=io.BytesIO()

@@ -1,8 +1,8 @@
 """Resolve missing vLLM dependencies and download verified archives before build.
 
 Uses the already installed target interpreter, including its existing CUDA
-PyTorch. Nothing is installed here. A broken mirror artifact causes one fresh
-official-index resolution, not a retry of the same broken direct URL.
+PyTorch. Nothing is installed here. Mirror-only mode omits official source
+links and fallback; the legacy mode can retry one fresh official resolution.
 """
 from __future__ import annotations
 
@@ -98,7 +98,7 @@ def _archives(report):
 
 
 def prepare(python, *, index_url, trusted_host, constraints, output,
-            fallback_index_url='https://pypi.org/simple', pip_runner=None):
+            fallback_index_url='https://pypi.org/simple', pip_runner=None, mirror_only=False):
     """Return prepared paths; ``pip_runner`` has the pip_index_install.install API."""
     # Preserve a venv's lexical bin/python path; resolving its symlink would
     # accidentally select the base interpreter and inspect another environment.
@@ -112,8 +112,9 @@ def prepare(python, *, index_url, trusted_host, constraints, output,
     root.mkdir(parents=True,exist_ok=False)
     execute=pip_runner or install
     indexes=[index_url.rstrip('/')]
-    if fallback_index_url and fallback_index_url.rstrip('/')!=indexes[0]:
+    if not mirror_only and fallback_index_url and fallback_index_url.rstrip('/')!=indexes[0]:
         indexes.append(fallback_index_url.rstrip('/'))
+    mode_options = {'mirror_only': True} if mirror_only else {}
     failures=[]
     for number,index in enumerate(indexes,1):
         attempt=root/('attempt-'+str(number))
@@ -121,18 +122,22 @@ def prepare(python, *, index_url, trusted_host, constraints, output,
         report_file=attempt/'resolution.json'
         wheelhouse=attempt/'wheelhouse'
         wheelhouse.mkdir()
-        resolve_args=['-c',str(constraints),'--no-binary=vllm','--no-build-isolation',
-            '--find-links',SOURCE_LINKS,*REQUIREMENTS,'--dry-run','--report',str(report_file)]
+        resolve_args=['-c',str(constraints),'--no-binary=vllm','--no-build-isolation']
+        if not mirror_only:
+            resolve_args.extend(['--find-links',SOURCE_LINKS])
+        resolve_args.extend([*REQUIREMENTS,'--dry-run','--report',str(report_file)])
         print('[SHORE dependencies] Resolving missing packages using '+index,flush=True)
         status=execute(interpreter,resolve_args,index_url=index,trusted_host=trusted_host,
-            log_dir=attempt/'resolve-logs',fallback_index_url='',operation='install')
+            log_dir=attempt/'resolve-logs',fallback_index_url='',operation='install',**mode_options)
         if status!=0:
             failures.append({'stage':'resolution','attempt':number,'exit_code':status})
             if number<len(indexes) and _failed_mirror(attempt/'resolve-logs',index):
                 print('[SHORE dependencies] Mirror resolution/download failed; resolving afresh with official fallback.',flush=True)
                 continue
-            _save(root/'failure.json',{'failures':failures})
-            raise RuntimeError('Dependency resolution failed; inspect '+str(attempt/'resolve-logs'))
+            _save(root/'failure.json',{'failures':failures, 'mirror_only': bool(mirror_only)})
+            detail = ('; mirror-only mode will not use another index. Check that the mirror supplies '
+                      'vllm==0.24.0 source and the pinned CUDA12.8 dependencies') if mirror_only else ''
+            raise RuntimeError('Dependency resolution failed'+detail+'; inspect '+str(attempt/'resolve-logs'))
         if not report_file.is_file():
             raise RuntimeError('pip succeeded without its required dependency report')
         records=_archives(json.loads(report_file.read_text(encoding='utf-8')))
@@ -148,13 +153,13 @@ def prepare(python, *, index_url, trusted_host, constraints, output,
             download_args=['--no-deps','--no-build-isolation','--require-hashes',
                 '-r',str(locked_urls),'--dest',str(wheelhouse)]
             status=execute(interpreter,download_args,index_url=index,trusted_host=trusted_host,
-                log_dir=attempt/'download-logs',fallback_index_url='',operation='download')
+                log_dir=attempt/'download-logs',fallback_index_url='',operation='download',**mode_options)
             if status!=0:
                 failures.append({'stage':'archive_download','attempt':number,'exit_code':status})
                 if number<len(indexes) and _failed_mirror(attempt/'download-logs',index):
                     print('[SHORE dependencies] Mirror archives failed; discarding those URL selections and resolving afresh.',flush=True)
                     continue
-                _save(root/'failure.json',{'failures':failures})
+                _save(root/'failure.json',{'failures':failures, 'mirror_only': bool(mirror_only)})
                 raise RuntimeError('Dependency archive download failed; inspect '+str(attempt/'download-logs'))
         for record in records:
             archive=wheelhouse/record['filename']
@@ -169,6 +174,7 @@ def prepare(python, *, index_url, trusted_host, constraints, output,
             'resolution_report':str(report_file),'archive_requirements':str(locked_urls),
             'artifacts':records,'archive_count':len(records),'all_archive_sha256_verified':True,
             'existing_packages_not_ignored':True,'fallback_used':number>1,
+            'mirror_only':bool(mirror_only),
             'prior_failures':failures,'packages_installed':False,'gpu_or_model_calls':0}
         _save(root/'prepared.json',result)
         print('[SHORE dependencies] Verified '+str(len(records))+' archives; prepared manifest: '+str(root/'prepared.json'),flush=True)
@@ -184,10 +190,13 @@ def main(argv=None):
     parser.add_argument('--constraints',required=True,type=Path)
     parser.add_argument('--output',required=True,type=Path)
     parser.add_argument('--fallback-index-url',default='https://pypi.org/simple')
+    parser.add_argument('--mirror-only',action='store_true',
+        help='Use only the configured package index; omit official source links and fallback')
     args=parser.parse_args(argv)
     try:
         prepare(args.python,index_url=args.index_url,trusted_host=args.trusted_host,
-            constraints=args.constraints,output=args.output,fallback_index_url=args.fallback_index_url)
+            constraints=args.constraints,output=args.output,fallback_index_url=args.fallback_index_url,
+            mirror_only=args.mirror_only)
         return 0
     except (OSError,ValueError,RuntimeError) as exc:
         print('[SHORE dependencies] '+str(exc),file=sys.stderr)

@@ -158,6 +158,7 @@ class BootstrapCuda128PathsTests(unittest.TestCase):
                     encoding='utf-8', newline='\n')
                 python.chmod(0o755)
                 program = '\n'.join((
+                    'MIRROR_ONLY=0',
                     'ENV_ROOT=' + shlex.quote(shell_path(root)),
                     'MODEL_ENV=' + shlex.quote(shell_path(root / 'model')),
                     'TORCH_PREPARE=prepare_torch_wheel.py',
@@ -176,6 +177,40 @@ class BootstrapCuda128PathsTests(unittest.TestCase):
                     self.assertIn(shell_path(root / 'wheelhouse' / 'torch-2.11.0+cu128-cp312-cp312-manylinux_2_28_x86_64.whl'), arguments)
                 self.assertIn('torchvision==0.26.0+cu128', arguments)
                 self.assertIn('torchaudio==2.11.0+cu128', arguments)
+
+    def test_mirror_only_torch_uses_exact_index_pins_and_preserves_partial(self) -> None:
+        source = SCRIPT.read_text(encoding='utf-8').split(
+            '# BEGIN TORCH_WHEEL_SELECTION\n', 1)[1].split('# END TORCH_WHEEL_SELECTION', 1)[0]
+        for pip_status in (0, 1):
+            with self.subTest(pip_status=pip_status):
+                root = self.base / ('mirror-' + str(pip_status))
+                wheelhouse = root / 'wheelhouse'
+                wheelhouse.mkdir(parents=True)
+                partial = wheelhouse / 'torch.whl.part'
+                partial.write_bytes(b'keep pre-existing official partial bytes')
+                calls = root / 'mirror-pip-arguments.txt'
+                program = '\n'.join((
+                    'MIRROR_ONLY=1',
+                    'ENV_ROOT=' + shlex.quote(shell_path(root)),
+                    'MODEL_ENV=' + shlex.quote(shell_path(self.bin)),
+                    'CONSTRAINTS=constraints-cu128.txt',
+                    'die() { printf "%s\\n" "$*" >&2; exit 2; }',
+                    'pip_install() { printf "%s\\n" "$@" > ' + shlex.quote(shell_path(calls))
+                    + '; return ' + str(pip_status) + '; }',
+                    source))
+                result = subprocess.run([self.bash, '-euc', program], capture_output=True,
+                    text=True, encoding='utf-8', errors='replace', timeout=20)
+                self.assertEqual(result.returncode, 0 if pip_status == 0 else 2,
+                                 result.stdout + result.stderr)
+                arguments = calls.read_text(encoding='utf-8').splitlines()
+                for requirement in ('torch==2.11.0+cu128', 'torchvision==0.26.0+cu128',
+                                    'torchaudio==2.11.0+cu128', '--only-binary=:all:'):
+                    self.assertIn(requirement, arguments)
+                self.assertNotIn('--find-links', arguments)
+                self.assertEqual(partial.read_bytes(), b'keep pre-existing official partial bytes')
+                self.assert_no_tools()
+                if pip_status:
+                    self.assertIn('Mirror-only Torch installation failed', result.stderr)
 
     def test_unknown_cpu_build_target_is_rejected_without_tools(self) -> None:
         self.assert_rejected("--env-root", shell_path(self.base / "invalid-target"),
