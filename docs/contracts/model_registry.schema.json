@@ -35,25 +35,16 @@
             "type": "string",
             "enum": [
               "Qwen3.8-27B",
-              "GLM-4.7-Flash",
               "Qwen3.6-35B-A3B",
-              "Kimi-Linear-48B-A3B-Instruct",
-              "GLM-4.5-Air-FP8",
               "Qwen3.5-122B-A10B-FP8",
-              "DeepSeek-V4-Flash",
-              "MiniMax-M2.5",
-              "Qwen3.5-397B-A17B-FP8",
               "Qwen3.6-35B-A3B-FP8",
               "Qwen-3.6-35B-A3B-FP8",
               "Qwen3.5-122B-A10B",
-              "Qwen3.5-397B-A17B",
               "27b",
               "35b",
               "35b-fp8",
               "122b",
-              "122b-fp8",
-              "397b",
-              "397b-fp8"
+              "122b-fp8"
             ]
           },
           "path": {
@@ -83,7 +74,7 @@
           "id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$",
-            "description": "模型绑定的唯一ID，多个智能体可共享一个ID，也可各自引用不同训练结果。"
+            "description": "模型绑定的唯一ID。单个白名单模型可加载多个运行实例，多个智能体或实例可共用同一ID及同源权重路径，无须重复复制权重；不同微调结果分别登记。"
           },
           "role": {
             "type": "string",

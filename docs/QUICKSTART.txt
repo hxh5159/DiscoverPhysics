@@ -10,7 +10,7 @@
 一、准备策略与模型路径
 
 可修改策略全部放在agent/，标准入口为agent/run.py。初始包已提供agent/strategy.json及
-models.json，默认使用公共目录Qwen3.8-27B。编辑strategy.json填写本队身份与本窗版本。
+models.json，默认使用公共目录Qwen3.8-27B。编辑strategy.json填写本队身份与本次版本。
 使用其他模型、训练checkpoint或多个模型时修改models.json，完整规范见STRATEGY_SUBMISSION.txt。
 也可用prepare_strategy.py生成新清单；同名文件存在时要求显式--overwrite。
 
@@ -28,12 +28,12 @@ models.json，默认使用公共目录Qwen3.8-27B。编辑strategy.json填写本
 
 不指定--worlds时运行1—6号全部公开宇宙；可用--worlds 1先检查一界。
 同一策略会取得mission和第一束光、自动实验、提交law.py/claims.json，调用固定积分器评分。
-每界基础框架默认3次模型决策，首次成功mission起600秒；模型加载和后续评分另计。
+六开发及九测评宇宙均固定3轮探索，不得修改或绕过。首次成功mission起600秒，模型加载和后续评分另计。
 完整结果在输出目录summary.json。旧结果目录不会覆盖，公开开发可反复运行。
 
 如已经部署了对应权重的本机服务，可额外传--base-url http://127.0.0.1:8000/v1。
 使用适配器时基础框架应自行启动已声明的底座和适配器；多模型服务安排由队伍策略处理。
-七个提供模型的目录见MODELS.txt。单一397B BF16容量不适合4H200全GPU加载，按实际资源选择。
+五个提供模型的目录及当前Qwen白名单见MODELS.txt；使用前按实际精度和资源完成模型自检。
 
 三、提交两类路径
 
@@ -42,8 +42,8 @@ models.json，默认使用公共目录Qwen3.8-27B。编辑strategy.json填写本
 其他共享目录，通过清单完整列出。多个智能体统一由agent/run.py协调，每份权重有唯一ID。
 测评期间停止编辑本次策略和权重，确认训练checkpoint已保存完成。
 
-指挥部在自己保管的环境中读取这两类路径，调用evaluate_strategy.py；正式环境不放入
-队伍项目。队伍程序只通过认证控制台实验，正式运行材料由指挥部保留。
-当前正式测评只运行Adam、Ramiel、Leliel，按0.3/0.4/0.3加权，九个定义和参考全部保留。
+指挥部根据这两类路径启动九宇宙正式测评。队伍程序通过控制台自动实验并生成
+law.py/claims.json，正式运行材料由指挥部保留；攻坚组无需接收真实模拟器。
+每组最多6次正式测评机会，六开发宇宙本地自测不占次数。榜单取最佳一次完整成绩。
 仅反馈本次总分、所测宇宙总分及必要启动/格式错误。六公开开发成绩不进入榜单。
 完整文件职责见PARTICIPANT_FILES.txt，具体接口与多模型示例见STRATEGY_SUBMISSION.txt。

@@ -1,4 +1,4 @@
-"""Offline build identities and seven-model manifest preparation boundaries."""
+"""Offline build identities and supplied-model manifest preparation boundaries."""
 import json
 from pathlib import Path
 import subprocess

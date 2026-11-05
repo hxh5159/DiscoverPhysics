@@ -26,7 +26,7 @@
       "Lilin"
     ],
     "strategy_assets": "全部自定义运行代码、提示词、推理配置和合法记忆位于agent目录；权重本体使用清单路径",
-    "model_binding": "所有模型使用唯一ID，完整checkpoint或底座加adapter_path逐项预检；相对路径基于models.json父目录"
+    "model_binding": "所有模型使用唯一ID，完整checkpoint或底座加adapter_path逐项预检；相对路径基于models.json父目录。单个白名单模型可加载多个实例，多个智能体或实例可共用同一ID及同源权重路径，无须重复复制权重；不同微调结果分别登记。"
   },
   "session": {
     "console_protocol_version": "1.0.0",

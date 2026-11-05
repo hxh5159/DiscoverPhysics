@@ -44,8 +44,8 @@ bash /tmp/shore-prepare-cpu-h200.sh \
 项目固定路径是运行时的位置，不是CPU安装依赖的前置条件。
 
 这一步不执行git、pip或Conda，不重新下载代码/模型。可以从任意目录启动，脚本会cd到PROJECT。
-默认27b；可在执行前export SHORE_MODEL=35b/35b-fp8/122b/122b-fp8/397b-fp8。
-397b纯BF16不适合4H200全GPU常驻。若实际模型挂载另有路径，可显式export SHORE_MODEL_ROOT。
+默认27b；可在执行前export SHORE_MODEL=35b/35b-fp8/122b/122b-fp8。
+只允许MODELS.txt中规定的Qwen模型，397B已移除。若实际模型挂载另有路径，可显式export SHORE_MODEL_ROOT。
 若新模型路径仍是overlay或空目录，先恢复共享挂载，不能靠mkdir得到另一实例已有模型。
 Qwen短烟测可能只生成思考token；以实际生成token验证链路，不将空最终文本误判为模型未加载。
 随后同一已加载服务完成六公开标准流程；实际分数/交卷质量由所用模型及策略决定。

@@ -43,8 +43,8 @@ class Opener:
 
 
 class ModelEntryTests(unittest.TestCase):
-    def test_seven_variants_have_distinct_names_and_manifest_identity(self):
-        self.assertEqual(len(catalog()['models']),7)
+    def test_five_variants_have_distinct_names_and_manifest_identity(self):
+        self.assertEqual(len(catalog()['models']),5)
         original = json.loads((ROOT/'examples/submission.json').read_text(encoding='utf-8'))
         for item in catalog()['models']:
             for alias in (item['id'],item['directory'],*item['directory_aliases']):
@@ -152,19 +152,19 @@ class ModelEntryTests(unittest.TestCase):
             self.assertEqual(environment['CXX'],'/cxx')
 
     def test_capacity_rejects_impossible_bf16_without_implicit_quantization(self):
-        plan=prepare_model('397b',inspect=False)
-        plan['checkpoint']={'weight_payload_bytes':794_000_000_000}
+        plan=prepare_model('122b',inspect=False)
+        plan['checkpoint']={'weight_payload_bytes':244_000_000_000}
         completed=subprocess.CompletedProcess([],0,json.dumps({'vllm':'0.24.0+cu128','cuda':'12.8',
-            'devices':[{'free_bytes':141_000_000_000,'total_bytes':141_000_000_000}]*4}), '')
+            'devices':[{'free_bytes':48_000_000_000,'total_bytes':48_000_000_000}]*4}), '')
         with patch('shore_agent.models.subprocess.run',return_value=completed):
             with self.assertRaisesRegex(InferenceError,'exceed'):verify_capacity(plan)
-            plan['checkpoint']['weight_payload_bytes']=400_000_000_000
+            plan['checkpoint']['weight_payload_bytes']=120_000_000_000
             verify_capacity(plan)
         self.assertTrue(plan['gpu_capacity_checked'])
         self.assertNotIn('--quantization',plan['command'])
 
     def test_plan_only_needs_no_model_gpu_or_inference_package(self):
-        result=subprocess.run([sys.executable,str(ROOT/'scripts/serve_model.py'),'--model','397b-fp8',
+        result=subprocess.run([sys.executable,str(ROOT/'scripts/serve_model.py'),'--model','122b-fp8',
             '--plan-only','--model-root','/nonexistent/models'],capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
         self.assertIsNone(json.loads(result.stdout)['checkpoint'])

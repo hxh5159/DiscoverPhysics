@@ -9,16 +9,18 @@ models.json声明schema_version=1.0.0、primary_model_id、models数组。
 每项必填唯一id、白名单base_model和path，可声明role、adaptation、adapter_path。
 完整权重在path；LoRA在adapter_path并同时给底座path。相对路径以models.json父目录为准。
 同一底座的多份训练结果使用不同ID和不同权重/适配器路径。
+单个白名单模型可以加载多个运行实例；多个智能体可共用同一ID及同源权重路径，
+无须重复复制权重。不同微调结果仍须分别登记。
 
 rift.strategy提供load_model_registry、model_binding、check_strategy_files与load_strategy_submission。
 控制台会话和RIFT_OUTPUT_DIR由指挥部提供，模型清单位置通过SHORE_MODEL_REGISTRY提供。
 固定SDK位置通过SHORE_SDK_ROOT提供，自定义模块使用agent包内的相对导入。
 指挥部检查所有声明的模型和适配器，不因默认只加载primary而漏收其他权重。
-运行期间保持代码、配置、检查点稳定，不将未保存完成的checkpoint作为本窗模型。
+运行期间保持代码、配置、检查点稳定，不将未保存完成的checkpoint作为本次模型。
 
 六公开开发和正式评测使用同一启动器及Console/law.py/claims.json协议。
-正式命令在指挥部执行evaluate_strategy.py；不从队伍项目读取真实模拟器或评分代码。
-当前正式集合Adam、Ramiel、Leliel，三档权重0.3/0.4/0.3，其他六界定义和参考仍保留。
+正式测评由指挥部启动，九个测评宇宙的真实模拟器不放入队伍项目。
+六开发及九测评宇宙均固定3轮，不得修改或绕过；每组最多6次正式测评机会，自测不占次数。
 正式运行每次独立，榜单取最佳完整一次，不拼接逐宇宙历史最高分。
 赛中只返回总分和所测各宇宙总分，隐藏日志、观测、新记忆和更新权重不归还队伍。
 

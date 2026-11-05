@@ -16,7 +16,8 @@ sys.path.insert(0, str(ROOT))
 from rift.submission import (SubmissionError, WHITELIST_MODELS, artifact_digest,
                              check_submission_files, load_manifest, manifest_digest,
                              parse_manifest, validate_manifest)
-from rift.model_registry import canonical_base_model
+from rift.model_registry import canonical_base_model, model_spec
+from rift.strategy import load_model_registry
 
 spec = importlib.util.spec_from_file_location("public_starter_packager", ROOT / "scripts/package_contest_starter.py")
 packager = importlib.util.module_from_spec(spec)
@@ -31,7 +32,7 @@ def manifest():
 
 def public_fixture(root):
     for name in packager.PUBLIC_FILES:
-        path = root / name
+        path = root / packager.PUBLIC_FILE_SOURCES.get(name, name)
         path.parent.mkdir(parents=True, exist_ok=True)
         if name == "docs/contracts/numerics.json":
             path.write_text(json.dumps({"numerics_version": "1.1", "integrator": "yoshida4",
@@ -120,6 +121,28 @@ class SubmissionTests(unittest.TestCase):
             with self.assertRaises(SubmissionError):
                 validate_manifest(value)
 
+    def test_retired_models_cannot_enter_by_manifest_alias_or_strategy_registry(self):
+        retired = ('GLM-4.7-Flash', 'GLM-4.5-Air-FP8', 'Kimi-Linear-48B-A3B-Instruct',
+                   'DeepSeek-V4-Flash', 'MiniMax-M2.5', 'Qwen3.5-397B-A17B',
+                   'Qwen3.5-397B-A17B-FP8', '397b', '397b-fp8')
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'models.json'
+            for name in retired:
+                with self.subTest(model=name):
+                    value = manifest()
+                    value['models'][0]['base_model'] = name
+                    with self.assertRaises(SubmissionError):
+                        validate_manifest(value)
+                    with self.assertRaises(ValueError):
+                        canonical_base_model(name)
+                    with self.assertRaises(ValueError):
+                        model_spec(name)
+                    value['models'][0]['id'] = 'primary'
+                    path.write_text(json.dumps({'schema_version':'1.0.0',
+                        'primary_model_id':'primary','models':value['models']}),encoding='utf-8')
+                    with self.assertRaises(SubmissionError):
+                        load_model_registry(path)
+
     def test_traversing_or_non_posix_model_paths_rejected(self):
         for path in ("../weights", "weights/../secret", "/models", "C:\\weights", "http://host/model", "weights//model"):
             value = manifest()
@@ -150,7 +173,7 @@ class SubmissionTests(unittest.TestCase):
         value = manifest()
         value["models"][0].update(adaptation="sft", revision="team-v2", sha256="A"*64)
         self.assertEqual(validate_manifest(value)["models"][0]["sha256"], "a"*64)
-        value["models"][0]["adaptation"] = "external_distillation"
+        value["models"][0]["adaptation"] = "unlisted_method"
         self.assert_path(lambda: validate_manifest(value), "$.models[0].adaptation")
 
     def test_single_file_digest_match_and_mismatch(self):
@@ -221,6 +244,7 @@ class SubmissionTests(unittest.TestCase):
                 names = set(archive.namelist())
                 self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "FILE_LIST.txt", "starter-manifest.json"})
                 self.assertTrue(all(name in archive.read("FILE_LIST.txt").decode("utf-8") for name in names))
+                self.assertEqual(archive.read("README.md"), (root / "docs/PARTICIPANT_README.md").read_bytes())
                 self.assertFalse(any(b"SECRET_MARKER_MUST_NOT_BE_PACKAGED" in archive.read(n) for n in names))
                 inventory = json.loads(archive.read("starter-manifest.json"))["files"]
                 for item in inventory:
@@ -252,6 +276,7 @@ class SubmissionTests(unittest.TestCase):
             with ZipFile(archive_path) as archive:
                 names = set(archive.namelist())
                 self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "FILE_LIST.txt", "starter-manifest.json"})
+                self.assertEqual(archive.read("README.md"), (ROOT / "docs/PARTICIPANT_README.md").read_bytes())
                 self.assertFalse(any(".project-memory" in name or "ScienceAgent" in name or "AGENTS" in name for name in names))
                 for name in names:
                     data = archive.read(name).lower()

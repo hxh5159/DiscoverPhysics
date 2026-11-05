@@ -9,7 +9,7 @@ from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
 ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_FILES = (
-    "LICENSE",
+    "README.md", "LICENSE",
     "rift/__init__.py", "rift/console.py", "rift/submission.py", "rift/law.py",
     "rift/observations.py", "rift/prediction.py", "rift/worker.py",
     "rift/model_registry.py", "rift/model_catalog.json", "rift/strategy.py",
@@ -44,6 +44,9 @@ PUBLIC_FILES = (
     "examples/Dockerfile.candidate",
     "examples/models.json", "examples/models.multi.json",
 )
+# The repository README documents upstream research. The participant archive
+# has its own task-oriented README at the conventional root entry point.
+PUBLIC_FILE_SOURCES = {"README.md": "docs/PARTICIPANT_README.md"}
 PUBLIC_NUMERICS_FIELDS = (
     "numerics_version", "integrator", "dt", "dtype", "sampling", "softening",
     "shared_implementation", "candidate_inputs", "private_world_access",
@@ -52,7 +55,7 @@ PUBLIC_NUMERICS_FIELDS = (
 )
 START_HERE = '''攻坚组开发与实验起步包
 
-先阅读docs/QUICKSTART.txt，再看PARTICIPANT_FILES.txt和MODEL_RUNTIME.txt。
+先阅读根目录README.md，再看docs/QUICKSTART.txt、PARTICIPANT_FILES.txt和MODEL_RUNTIME.txt。
 本包包含六公开宇宙、可修改LLM基础框架、固定候选积分器及公开计分程序。
 在已安装NumPy与SciPy的官方环境中，可运行：
   python scripts/validate_submission.py examples/submission.json
@@ -61,13 +64,12 @@ START_HERE = '''攻坚组开发与实验起步包
 
 模型准备后，从本包根目录运行python -m development_worlds.runner --help。
 完整可修改策略在agent/，统一入口为agent/run.py；models.json逐项声明本次全部模型权重路径。
-基础框架每个宇宙默认最多3次模型决策，最后一轮优先提交law.py与claims.json。
+每个开发与测评宇宙的探索固定3轮，不得修改或绕过；最后一轮优先提交law.py与claims.json。
 公开开发驱动和正式驱动使用相同Console及law.py/claims.json提交接口。
 每队提交agent目录与models.json两类绝对路径。多个子智能体由agent/run.py统一协调。
-正式测评由指挥部管理员按路径读取；测评期间停止编辑代码、配置及所用权重。
+每组最多6次正式测评，六开发宇宙本地自测不占次数；测评期间停止编辑代码、配置及所用权重。
 模型从本队配置的实际目录加载，正式控制台地址及会话令牌由指挥部运行器提供。
-九宇宙环境保留在指挥部私有目录，使用指挥部evaluate_strategy.py统一启动；
-当前测评选择Adam、Ramiel、Leliel三个宇宙，其余六个宇宙定义和验证数据保留。
+九个正式测评宇宙的环境和验证数据由指挥部保管，不放入本开发包。
 正式模拟、固定积分评分和隐藏运行材料由指挥部管理。详见docs/STRATEGY_SUBMISSION.txt。
 本包不含正式九宇宙的真实模拟器、定律参数或隐藏验证真值，也不附带权重和凭证。
 六公开运行的观测及日志可保留；九隐藏运行材料由指挥部保留，赛中只返回规定成绩和必要错误。
@@ -115,11 +117,12 @@ def build_starter(output, *, root=ROOT, overwrite=False):
         raise FileExistsError("Output already exists; choose another path or use --overwrite.")
     payloads = {}
     for relative in PUBLIC_FILES:
-        lexical = root / relative
+        source_relative = PUBLIC_FILE_SOURCES.get(relative, relative)
+        lexical = root / source_relative
         if lexical.is_symlink() or not lexical.resolve().is_relative_to(root) or not lexical.is_file():
             raise ValueError(f"Required public file is missing or not a regular in-root file: {relative}")
         current = root
-        for part in Path(relative).parts:
+        for part in Path(source_relative).parts:
             current /= part
             if current.is_symlink():
                 raise ValueError(f"Public source path must not contain symlinks: {relative}")
@@ -138,8 +141,10 @@ def build_starter(output, *, root=ROOT, overwrite=False):
                 "formal_entrypoint": "organizer evaluate_strategy.py",
                 "editable_strategy_directory": "agent",
                 "model_registry": "models.json",
-                "formal_evaluation_worlds": ["Adam", "Ramiel", "Leliel"],
+                "formal_evaluation_worlds": ["Adam", "Lilith", "Tabris", "Sachiel", "Ramiel", "Matriel", "Leliel", "Arael", "Lilin"],
                 "baseline_max_turns": 3,
+                "formal_evaluation_limit": 6,
+                "participant_readme": "README.md",
                 "requires_external_organizer_runtime": True,
                 "files": inventory}
     manifest["public_contract_projection"] = "Normative public contracts only; internal design reviews excluded; schema identifiers use the participant namespace. Scoring and numerical rules are unchanged."

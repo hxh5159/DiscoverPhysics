@@ -8,12 +8,6 @@ import json
 from pathlib import Path
 
 _CATALOG_FILE = Path(__file__).with_name('model_catalog.json')
-_ORIGINAL_MODELS = (
-    'Qwen3.8-27B', 'GLM-4.7-Flash', 'Qwen3.6-35B-A3B',
-    'Kimi-Linear-48B-A3B-Instruct', 'GLM-4.5-Air-FP8',
-    'Qwen3.5-122B-A10B-FP8', 'DeepSeek-V4-Flash', 'MiniMax-M2.5',
-    'Qwen3.5-397B-A17B-FP8',
-)
 
 
 def catalog():
@@ -50,12 +44,12 @@ def canonical_base_model(value):
     try:
         return model_spec(value)['base_model']
     except ValueError:
-        if value in _ORIGINAL_MODELS:
-            return value
         raise ValueError('Model is outside the published whitelist and supplied variants.') from None
 
 
-WHITELIST_MODELS = tuple(dict.fromkeys((*_ORIGINAL_MODELS,
-    *(item['base_model'] for item in catalog()['models']))))
+# The current catalog is also the published whitelist. Keep no fallback to
+# retired models: declarations, local model services and strategy registries
+# must all enforce the same current selection.
+WHITELIST_MODELS = tuple(item['base_model'] for item in catalog()['models'])
 
 __all__ = ['catalog', 'model_spec', 'resolve_model_id', 'canonical_base_model', 'WHITELIST_MODELS']
