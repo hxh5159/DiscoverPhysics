@@ -93,7 +93,7 @@ class DiscoveryAgent:
     """Dependency-injected loop: tests may supply a mock, normal CLI never does."""
 
     def __init__(self, console, model, output_dir, *, max_tokens=4096,
-                 request_timeout=300., tool_timeout=30., max_turns=0,
+                 request_timeout=300., tool_timeout=30., max_turns=3,
                  max_context_chars=28000, clock=time.monotonic):
         self.console, self.model = console, model
         self.directory = Path(output_dir).resolve()
@@ -187,10 +187,17 @@ class DiscoveryAgent:
             self.last_budget = result["budget"]
         return result
 
-    def _messages(self):
+    def _messages(self, turn):
         state = {"remaining_seconds": round(self.remaining(), 3), "budget": self.last_budget,
                  "record_count": len(self.records), "saved_candidate": self.latest,
+                 "turn": turn, "max_turns": self.max_turns,
+                 "remaining_model_calls_including_current":
+                     self.max_turns-turn+1 if self.max_turns else None,
                  "instruction": "Use view_record index/start/count pages to inspect full data; submit a valid candidate before time expires."}
+        if self.max_turns:
+            state["instruction"] += " Plan experiments and candidate generation within the remaining model calls."
+            if turn == self.max_turns:
+                state["instruction"] += " This is the final model call. Return submit with complete law.py and claims now; reuse the best saved candidate if needed."
         essential = [{"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "MISSION:\n"+_json(compact(self.mission))},
             {"role": "user", "content": "CURRENT_STATE:\n"+_json(state)}]
@@ -224,7 +231,7 @@ class DiscoveryAgent:
                     break
                 row = {"turn": turn, "remaining_before": self.remaining()}
                 try:
-                    response = self.model.complete(self._messages(), max_tokens=self.max_tokens,
+                    response = self.model.complete(self._messages(turn), max_tokens=self.max_tokens,
                         timeout=max(.001, min(self.request_timeout, self.remaining())))
                     if self.remaining() <= 0:
                         row["late_response_rejected"] = True
@@ -262,7 +269,8 @@ class DiscoveryAgent:
                 status = "optional_turn_limit_no_submission"
         finally:
             self._save_json("events.json", self.events)
-            summary = {"status": status, "turns": turn, "elapsed_seconds": self.clock()-begin,
+            summary = {"status": status, "turns": turn, "max_turns": self.max_turns,
+                "elapsed_seconds": self.clock()-begin,
                 "has_saved_pair": self.latest is not None,
                 "model_transport": getattr(self.model, "capability_label", "injected_transport_not_model_verification"),
                 "capability_limit": "Successful execution does not establish prediction quality."}
@@ -284,8 +292,8 @@ def main(argv=None):
     parser.add_argument("--max-tokens", type=int, default=4096)
     parser.add_argument("--request-timeout", type=float, default=300.)
     parser.add_argument("--tool-timeout", type=float, default=30.)
-    parser.add_argument("--max-turns", type=int, default=0,
-                        help="Optional local diagnostic cap; zero uses only the session time budget.")
+    parser.add_argument("--max-turns", type=int, default=3,
+                        help="Maximum model calls per universe (default 3); zero uses only the session time budget.")
     args = parser.parse_args(argv)
     if (min(args.max_tokens, args.tp_size) <= 0 or args.max_turns < 0
             or any(not math.isfinite(v) or v <= 0 for v in

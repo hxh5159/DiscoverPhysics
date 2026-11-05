@@ -76,6 +76,57 @@ class RunnableBaselineTests(unittest.TestCase):
                 with self.assertRaises(ConsoleError):
                     client.mission()
 
+    def test_default_three_calls_keep_last_valid_draft_and_warn_final_call(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            session = DevelopmentSession(self.console(), directory/'session')
+            model = ScriptedModel([
+                {'action': 'archive'},
+                {'action': 'draft', 'law': LAW, 'claims': CLAIMS},
+                {'action': 'archive'},
+                {'action': 'submit', 'law': LAW, 'claims': CLAIMS}])
+            with serve_session(session) as auth:
+                client = Console(auth['endpoint'], auth['token'], timeout=5)
+                outcome = DiscoveryAgent(client, model, directory/'agent').run()
+            self.assertEqual(len(model.calls), 3)
+            self.assertEqual(outcome['max_turns'], 3)
+            self.assertEqual(outcome['status'], 'submitted_after_optional_turn_limit')
+            self.assertTrue(session.closed)
+            self.assertIsNotNone(session.latest)
+            states = [json.loads(next(message['content'].split('\n', 1)[1]
+                for message in call[0] if message['content'].startswith('CURRENT_STATE:\n')))
+                for call in model.calls]
+            self.assertEqual([state['remaining_model_calls_including_current'] for state in states], [3, 2, 1])
+            self.assertIn('final model call', states[-1]['instruction'])
+            self.assertIn('Return submit', states[-1]['instruction'])
+
+    def test_three_calls_without_candidate_do_not_fabricate_submission(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            session = DevelopmentSession(self.console(), directory/'session')
+            model = ScriptedModel([{'action': 'archive'}]*4)
+            with serve_session(session) as auth:
+                client = Console(auth['endpoint'], auth['token'], timeout=5)
+                outcome = DiscoveryAgent(client, model, directory/'agent').run()
+            self.assertEqual(len(model.calls), 3)
+            self.assertEqual(outcome['status'], 'optional_turn_limit_no_submission')
+            self.assertFalse(outcome['has_saved_pair'])
+            self.assertIsNone(session.latest)
+            self.assertFalse((directory/'agent/law.py').exists())
+
+    def test_explicit_zero_retains_time_only_mode(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            session = DevelopmentSession(self.console(), directory/'session')
+            model = ScriptedModel([{'action': 'archive'}]*4 +
+                [{'action': 'submit', 'law': LAW, 'claims': CLAIMS}])
+            with serve_session(session) as auth:
+                client = Console(auth['endpoint'], auth['token'], timeout=5)
+                outcome = DiscoveryAgent(client, model, directory/'agent', max_turns=0).run()
+            self.assertEqual(len(model.calls), 5)
+            self.assertEqual(outcome['status'], 'submitted')
+            self.assertEqual(outcome['max_turns'], 0)
+
     def test_invalid_pair_and_late_pair_never_replace_accepted_draft(self):
         now = [0.]
         with tempfile.TemporaryDirectory() as folder:

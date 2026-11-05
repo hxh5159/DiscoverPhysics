@@ -1,6 +1,6 @@
 {
   "scoring_version": "draft-3.11.0",
-  "updated": "2026-11-01",
+  "updated": "2026-11-05",
   "implementation_status": "按用户确认统一恢复10e预言映射；MSE/globalV、80/15/5、P>=40节约资格、加权节约分升序同分规则及仅总分反馈保持；不新增模型或物理实验",
   "total_max_score": 100,
   "prediction": {
@@ -181,14 +181,14 @@
   "ready_for_ranking": false,
   "ranking": {
     "primary": "未作显示舍入的加权总分降序",
-    "only_tiebreak": "同一次完整提交的九宇宙加权节约分升序",
-    "method": "C_weighted=0.3*mean(C_Adam,C_Lilith,C_Tabris)+0.4*mean(C_Sachiel,C_Ramiel,C_Matriel)+0.3*mean(C_Leliel,C_Arael,C_Lilin)",
+    "only_tiebreak": "同一次完整提交的所选三宇宙加权节约分升序",
+    "method": "C_weighted=0.3*C_Adam+0.4*C_Ramiel+0.3*C_Leliel",
     "tier_weights": [
       0.3,
       0.4,
       0.3
     ],
-    "worlds_per_tier": 3,
+    "worlds_per_tier": 1,
     "input": "本次已计算并私有保存的每个宇宙节约分C，不从宇宙总分推测，不新采样或运行模型",
     "compute_when": "本次完整计分时保存私有C及加权C；主总分相同才用于排序",
     "remaining_tie": "并列；受理时间或job_id仅保证显示顺序，不改变并列名次",
@@ -203,7 +203,7 @@
     "each_submission_is_independent": true,
     "complete_scoring_per_submission": true,
     "previous_submission_used_as_scoring_input": false,
-    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价九宇宙；不读取历史提交来补全本次结果或调整本次分数",
+    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价本次选定的三个宇宙；不读取历史提交来补全本次结果或调整本次分数",
     "new_submission_may_differ": "参赛队可反复改进并提交；不同次运行或随机探索不要求产生相同结果，不把独立新提交当作对旧提交的复算",
     "best_result_scope": "在线榜单和最终结算均选取同一攻坚组有效完整提交中加权总分最高的一次；其各宇宙分数须来自该同一次完整提交",
     "per_world_historical_best_stitching_allowed": false,
@@ -224,5 +224,28 @@
     "shares_team_training_gpus": false,
     "blocks_team_normal_training": false,
     "description": "正式评测使用指挥部独立资源，不占用攻坚组用于开发和训练的四卡；指挥部队列容量和通常反馈耗时仍需工程测量"
+  },
+  "evaluation_selection": {
+    "available_worlds": [
+      "Adam",
+      "Lilith",
+      "Tabris",
+      "Sachiel",
+      "Ramiel",
+      "Matriel",
+      "Leliel",
+      "Arael",
+      "Lilin"
+    ],
+    "evaluation_worlds": [
+      "Adam",
+      "Ramiel",
+      "Leliel"
+    ],
+    "worlds_per_tier_evaluated": 1,
+    "selection_basis": "按此前已完成的固定参数六公开到九隐藏模拟各档总分，选择档内第二名，不重新模拟挑选。",
+    "weighted_total": "S=0.3*S_Adam+0.4*S_Ramiel+0.3*S_Leliel",
+    "unselected_worlds": "保留全部定义、真实模拟器、参数与验证数据，本次不运行、不计零、不作为缺交卷。",
+    "historical_scores": "三宇宙与九宇宙运行使用独立榜单，不混排或拼接历史成绩。"
   }
 }

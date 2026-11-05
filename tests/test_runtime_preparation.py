@@ -20,7 +20,17 @@ class RuntimePreparationTests(unittest.TestCase):
                 self.assertEqual(result['models'][0]['base_model'],item['base_model'])
                 self.assertEqual(result['models'][0]['path'],result['entrypoint'][-1])
                 self.assertEqual(result['models'][0]['path'],catalog()['model_root']+'/'+item['directory'])
+                self.assertEqual(result['entrypoint'][result['entrypoint'].index('--max-turns')+1], '3')
                 self.assertEqual(validate_manifest(result),result)
+
+    def test_manifest_preserves_explicit_turn_override_and_rejects_invalid_caps(self):
+        for maximum in (0, 3, 5):
+            manifest = make_manifest('27b', 'team01', 'run01', max_turns=maximum)
+            command = manifest['entrypoint']
+            self.assertEqual(command[command.index('--max-turns')+1], str(maximum))
+        for maximum in (-1, True, 1.5):
+            with self.assertRaises(ValueError):
+                make_manifest('27b', 'team01', 'run01', max_turns=maximum)
 
     def test_custom_actual_model_root_and_training_checkpoint(self):
         self.assertEqual(make_manifest('27b','team01','run01',model_root='/inspire/team/models')['models'][0]['path'],

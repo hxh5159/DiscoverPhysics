@@ -3,7 +3,7 @@
   "submission_id": "interface-demo-v1",
   "team_id": "example-team",
   "version": "0.1.0",
-  "entrypoint": ["python", "-m", "shore_agent.agent", "--model", "27b", "--model-path", "/inspire/hdd/project/26-the-other-shore/public/models/Qwen3.8-27B"],
+  "entrypoint": ["python", "-m", "shore_agent.agent", "--model", "27b", "--model-path", "/inspire/hdd/project/26-the-other-shore/public/models/Qwen3.8-27B", "--max-turns", "3"],
   "models": [
     {
       "base_model": "Qwen3.8-27B",

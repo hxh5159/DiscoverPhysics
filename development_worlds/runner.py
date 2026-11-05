@@ -121,16 +121,18 @@ def main(argv=None):
     parser.add_argument("--model-python", default=os.environ.get("SHORE_MODEL_PYTHON"))
     parser.add_argument("--tp-size", type=int, default=4)
     parser.add_argument("--max-tokens", type=int, default=4096)
+    parser.add_argument("--max-turns", type=int, default=3,
+                        help="Maximum baseline model calls per universe (default 3); zero removes this cap.")
     parser.add_argument("--agent-command", nargs=argparse.REMAINDER,
                         help="Optional custom command argument list; put this option last.")
     args = parser.parse_args(argv)
-    if args.seed < 0 or not 0 < args.startup_timeout < float("inf"):
-        parser.error("seed must be nonnegative; startup timeout must be finite and positive.")
+    if args.seed < 0 or args.max_turns < 0 or not 0 < args.startup_timeout < float("inf"):
+        parser.error("seed and max-turns must be nonnegative; startup timeout must be finite and positive.")
     if args.output.exists():
         parser.error("Choose a new output directory; prior runs are not overwritten.")
     command = args.agent_command or [sys.executable, "-m", "shore_agent.agent", "--model", args.model,
         "--tp-size", str(args.tp_size), "--max-tokens", str(args.max_tokens),
-        "--startup-timeout", str(args.startup_timeout)]
+        "--startup-timeout", str(args.startup_timeout), "--max-turns", str(args.max_turns)]
     if not args.agent_command:
         for key in ("base_url", "model_id", "model_root", "model_path", "model_python"):
             value = getattr(args, key)

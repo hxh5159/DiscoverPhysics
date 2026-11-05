@@ -56,11 +56,13 @@ START_HERE = '''攻坚组开发与实验起步包
 
 模型准备后，从本包根目录运行python -m development_worlds.runner --help。
 实际默认入口python -m shore_agent.agent会加载所选本地模型并自动探索；没有模型就明确报错。
+基础框架每个宇宙默认最多3次模型决策，最后一轮优先提交law.py与claims.json。
 公开开发驱动和正式驱动使用相同Console及law.py/claims.json提交接口。
 提交根目录为包含shore_agent、rift和提交清单的完整工作区，不再只复制examples目录。
 正式测评直接运行本队当前项目；测评期间停止编辑代码、配置及所用权重。
 模型从本队配置的实际目录加载，正式控制台地址及会话令牌由指挥部运行器提供。
 九宇宙环境由指挥部接入后，使用scripts/evaluate_submission.py统一启动；
+当前测评选择Adam、Ramiel、Leliel三个宇宙，其余六个宇宙定义和验证数据保留。
 正式模拟、固定积分评分和隐藏运行材料由指挥部管理，不要求重新封装本队镜像。
 本包不含正式九宇宙的真实模拟器、定律参数或隐藏验证真值，也不附带权重和凭证。
 六公开运行的观测及日志可保留；九隐藏运行材料由指挥部保留，赛中只返回规定成绩和必要错误。
@@ -129,6 +131,8 @@ def build_starter(output, *, root=ROOT, overwrite=False):
                 "contains_model_weights": False,
                 "formal_execution_mode": "direct_project",
                 "formal_entrypoint": "scripts/evaluate_submission.py",
+                "formal_evaluation_worlds": ["Adam", "Ramiel", "Leliel"],
+                "baseline_max_turns": 3,
                 "requires_external_organizer_runtime": True,
                 "files": inventory}
     manifest["public_contract_projection"] = "Normative public contracts only; internal design reviews excluded; schema identifiers use the participant namespace. Scoring and numerical rules are unchanged."
