@@ -1,72 +1,26 @@
-攻坚组智能体提交规范 1.1.0（直接项目运行）
+提交接口：策略目录与模型路径清单
 
-一、项目与逐宇宙交卷
+当前正式接口为两类路径：agent目录的绝对路径、models.json的绝对路径。
+策略结构、完整字段、多智能体/多checkpoint例子及命令见STRATEGY_SUBMISSION.txt。
 
-攻坚组在自己的实际项目目录中开发，保留submission.json约定的启动入口。指挥部在测评
-窗口接入九宇宙运行包，直接启动该项目当前代码和模型；不要求制作队伍容器或复制模型。
-测评期间停止编辑代码、配置和所用权重。模型加载完成后，智能体在每个宇宙自动实验，
-通过控制台提交该界law.py和claims.json。固定积分与评分由指挥部程序执行。
+agent/strategy.json只声明schema_version=1.0.0、team_id、submission_id、version。
+入口固定为agent/run.py，多个子智能体统一由该入口协调。全部自定义策略资产在agent/。
+models.json声明schema_version=1.0.0、primary_model_id、models数组。
+每项必填唯一id、白名单base_model和path，可声明role、adaptation、adapter_path。
+完整权重在path；LoRA在adapter_path并同时给底座path。相对路径以models.json父目录为准。
+同一底座的多份训练结果使用不同ID和不同权重/适配器路径。
 
-二、启动清单
+rift.strategy提供load_model_registry、model_binding、check_strategy_files与load_strategy_submission。
+控制台会话和RIFT_OUTPUT_DIR由指挥部提供，模型清单位置通过SHORE_MODEL_REGISTRY提供。
+固定SDK位置通过SHORE_SDK_ROOT提供，自定义模块使用agent包内的相对导入。
+指挥部检查所有声明的模型和适配器，不因默认只加载primary而漏收其他权重。
+运行期间保持代码、配置、检查点稳定，不将未保存完成的checkpoint作为本窗模型。
 
-    {
-      "schema_version": "1.0.0",
-      "submission_id": "team01-v1",
-      "team_id": "team01",
-      "version": "1.0.0",
-      "entrypoint": ["python", "-m", "shore_agent.agent", "--model", "27b", "--model-path", "/inspire/hdd/project/26-the-other-shore/public/models/Qwen3.8-27B"],
-      "models": [{
-        "base_model": "Qwen3.8-27B",
-        "path": "/inspire/hdd/project/26-the-other-shore/public/models/Qwen3.8-27B",
-        "adaptation": "base"
-      }]
-    }
+六公开开发和正式评测使用同一启动器及Console/law.py/claims.json协议。
+正式命令在指挥部执行evaluate_strategy.py；不从队伍项目读取真实模拟器或评分代码。
+当前正式集合Adam、Ramiel、Leliel，三档权重0.3/0.4/0.3，其他六界定义和参考仍保留。
+正式运行每次独立，榜单取最佳完整一次，不拼接逐宇宙历史最高分。
+赛中只返回总分和所测各宇宙总分，隐藏日志、观测、新记忆和更新权重不归还队伍。
 
-六个根字段必填，不接受未知字段。submission_id与team_id为不超过64字符的字母数字标识，
-可含点、横线和下划线；version为本组版本说明。make_submission.py可从七预设生成小型
-清单，默认使用model_catalog.json中的实际模型根；支持--model-root和--model-path。
-
-entrypoint是直接执行的argv数组，不是shell命令字符串；不接受bash/sh包装入口。
-工作目录是本次队伍实际项目根目录。可填实验环境Python绝对路径，或由指挥部通过
---agent-python指定python入口使用的解释器。新增模块和配置直接从本队项目读取，
-不要求放进预设镜像。入口应使用已经安装好的依赖，不能在无网评测时临时下载。
-
-每个模型必须声明白名单base_model与实际path。path可为项目内POSIX相对路径，或实例
-中的Linux绝对路径；不接受..、反斜线、冒号、重复分隔符。旧/models/...声明保持兼容，
-但不是当前默认路径。revision、sha256、adaptation可选；adaptation为base、quantized、
-sft、rl或other。完整检查点或底座与适配器的实际加载由本队入口完成并提前自测。
-声明模型名称不证明来源或显存可用；清单不会自动修改权重或重新训练模型。
-
-三、自动运行环境与固定指令
-
-每界由指挥部运行器设置RIFT_CONSOLE_URL、RIFT_SESSION_TOKEN、RIFT_OUTPUT_DIR。
-控制台只授权当前会话，合法本机HTTP JSON通信属于官方通道。智能体使用rift.Console
-完成mission、observe、launch、archive、save_draft和submit。law.py仍为不联网、不读写
-文件的纯数学程序；不把智能体工作流写入law.py。
-
-从本队项目根目录，由指挥部执行：
-
-  python scripts/evaluate_submission.py --organizer-root /指挥部运行包目录 \
-    --manifest submission.json --output /指挥部结果目录/本次运行
-
-可用--project-root明确项目目录，--profile指定指挥部配置，--agent-python指定实际解释器。
---check-only只检查入口与配置，不启动模型或给科学分数。输出目录须为新目录。
-运行包由外界接入，公开入口本身不包含九宇宙模拟器、验证真值或评分答案。
-
-四、公开自检
-
-  python scripts/validate_submission.py submission.json
-  python scripts/validate_submission.py submission.json --root . --check-files
-
-默认只检查JSON、白名单和路径格式，不运行入口、不读取权重。--check-files才检查
-声明的相对文件和实际Linux绝对路径；如填sha256则读取内容校验，可能耗时较长。
-旧/models/...声明留待旧部署环境检查。文件/目录摘要算法由rift.submission.artifact_digest
-规定。examples/agent.py会转发到实际基础智能体；它不是零加速度替代方案。
-
-五、计分与材料边界
-
-六公开环境允许反复开发、自测和生成训练数据，不计入正式榜单。九隐藏每次新建独立
-会话与配额，完成整轮后反馈总分和各宇宙总分，不拼接不同运行的单界最高分。
-九隐藏观测、对话、候选、日志、新记忆和更新权重赛中不返还，由指挥部保留。
-四个测试窗口的次数由指挥部管理。截止按成功受理时间；基础设施故障保留本次版本，
-修复后重评。模型权重/代码不因接入环境被自动替换，测评期间不得人工干预。
+旧submission.json/entrypoint接口用于历史运行兼容；新提交按本文件的目录和模型清单执行。
+内部运行器可将上述两份小清单规范化为旧记录结构，以复用配对交卷和榜单代码。

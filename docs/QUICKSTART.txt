@@ -1,102 +1,49 @@
-彼岸挑战：参赛程序快速开始
+彼岸挑战：策略目录开发与路径提交
 
-一、准备
-
-解压攻坚组开发包，进入同时含shore_agent、development_worlds和rift的包根目录。
-不需要克隆研究仓库，不需要指挥部私有包。已有配置好的依赖与本地模型时可直接进入第二步。
-联网CPU制作CUDA12.8镜像、随后在无网H200运行的完整环境步骤见H200_OFFLINE_SETUP.txt。
-requirements.txt只列实验与拟合依赖；模型环境使用官方bootstrap流程，不宽松安装其他vLLM版本。
-
-以下命令都在远端Linux执行。已配置好的标准环境：
+先安装实验依赖与模型推理环境，准备白名单本地权重。完整环境说明见H200_OFFLINE_SETUP.txt。
+以下命令在远端Linux项目根目录执行；按实际已安装的解释器设置变量。
 
   PY='/opt/shore-h200-cu128/.venv-trial/bin/python'
   MPY='/opt/shore-h200-cu128/.venv-vllm-cu128/bin/python'
   MODELROOT='/inspire/hdd/project/26-the-other-shore/public/models'
-  MODEL='27b'
 
-路径不同时只调整对应变量。模型目录必须已实际挂载，不能仅在另一个实例的overlay中存在。
-若尚需安装CPU实验依赖，使用本地已选Python及所在环境认可的索引：
+一、准备策略与模型路径
 
-  env -u PIP_EXTRA_INDEX_URL -u PIP_INDEX_URL PIP_CONFIG_FILE=/dev/null \
-    "$PY" -m pip install -r requirements.txt \
-    --index-url "$PIP_MIRROR" --trusted-host "$PIP_MIRROR_HOST" --no-cache-dir
+可修改策略全部放在agent/，标准入口为agent/run.py。初始包已提供agent/strategy.json及
+models.json，默认使用公共目录Qwen3.8-27B。编辑strategy.json填写本队身份与本窗版本。
+使用其他模型、训练checkpoint或多个模型时修改models.json，完整规范见STRATEGY_SUBMISSION.txt。
+也可用prepare_strategy.py生成新清单；同名文件存在时要求显式--overwrite。
 
-PIP_MIRROR与PIP_MIRROR_HOST由使用者填入平台镜像地址；无网H200不执行安装。
+  "$PY" scripts/prepare_strategy.py --help
+  "$PY" scripts/validate_strategy.py --agent-dir "$PWD/agent" --models-file "$PWD/models.json" --check-files
 
-二、直接运行六公开宇宙
+该检查会逐项检查全部模型与适配器文件，不加载大模型，不判断真实物理规律。
 
-  "$PY" scripts/serve_model.py --list
-
-七个预设为27b、35b、35b-fp8、122b、122b-fp8、397b、397b-fp8。
-先用27b检查流程，再按算力及实际精度选择其它预设。纯BF16的397b不适合4H200全GPU加载；
-同家族可选已提供397b-fp8，不会在程序里偷偷更改权重精度。
+二、运行六公开宇宙
 
   "$PY" -m development_worlds.runner \
-    --worlds 1 2 3 4 5 6 --model "$MODEL" --model-root "$MODELROOT" \
-    --model-python "$MPY" --output "results/dev-$(date +%Y%m%d-%H%M%S)"
+    --agent-dir "$PWD/agent" --models-file "$PWD/models.json" \
+    --model-python "$MPY" --max-turns 3 \
+    --output "results/dev-$(date +%Y%m%d-%H%M%S)"
 
-程序按世界启动同一个基础agent，加载模型后领取任务，自主实验、拟合和保存候选，
-最后提交law.py/claims.json，再由固定积分器和公开评测器计分。
-未加载模型、推理服务失败或没有合法交卷时会明确记录，不用预置答案或零加速度伪装完成。
-基础框架每个世界默认最多3次模型决策（--max-turns 3），最后一轮优先提交law.py与claims.json。每个世界从首次成功mission起600秒；加载另计，评分发生在探索结束之后。
+不指定--worlds时运行1—6号全部公开宇宙；可用--worlds 1先检查一界。
+同一策略会取得mission和第一束光、自动实验、提交law.py/claims.json，调用固定积分器评分。
+每界基础框架默认3次模型决策，首次成功mission起600秒；模型加载和后续评分另计。
+完整结果在输出目录summary.json。旧结果目录不会覆盖，公开开发可反复运行。
 
-输出根目录中的summary.json给出各公开世界结果；各world目录保存合法观测、候选、日志及分项。
-旧输出目录不覆盖。公开开发可无限重开会话；每次标准会话仍按100能量、20次observe计量。
-可先把--worlds改为2，检查一界后再跑全六界。目录中的真公式公开，但基础agent不会读取它们。
+如已经部署了对应权重的本机服务，可额外传--base-url http://127.0.0.1:8000/v1。
+使用适配器时基础框架应自行启动已声明的底座和适配器；多模型服务安排由队伍策略处理。
+七个提供模型的目录见MODELS.txt。单一397B BF16容量不适合4H200全GPU加载，按实际资源选择。
 
-三、复用已启动的本地推理服务
+三、提交两类路径
 
-自动模式每个新agent都独立启动模型。开发时可在同一GPU节点的终端A先启动一次：
+开赛后，各队只需向指挥部提交本次agent/的绝对路径，以及models.json的绝对路径。
+所有推理时读取的自定义策略文件、提示词、配置与合法记忆必须在agent/；权重本体可在
+其他共享目录，通过清单完整列出。多个智能体统一由agent/run.py协调，每份权重有唯一ID。
+测评期间停止编辑本次策略和权重，确认训练checkpoint已保存完成。
 
-  "$PY" scripts/serve_model.py --model "$MODEL" --model-root "$MODELROOT" --model-python "$MPY"
-
-同节点终端B运行：
-
-  "$PY" -m development_worlds.runner --worlds 1 2 3 4 5 6 --model "$MODEL" \
-    --base-url http://127.0.0.1:8000/v1 \
-    --output "results/shared-service-$(date +%Y%m%d-%H%M%S)"
-
-基础客户端只连接显式本机服务，不自动调用外部模型。两种启动方式使用相同实验和计分链。
-
-四、修改自己的方案
-
-shore_agent/是可修改基础框架。可以改提示词、历史与记忆、实验策略和工具，或使用合法的
-自训权重；不强制使用这个基线。模型只获取mission及本局允许观测，不向模型提供评测真值。
-check/fit工具只使用已取得的观测，通过固定积分器检验模型自己提出的候选程序。
-完整可改/固定文件划分见PARTICIPANT_FILES.txt，law接口见LAW_API.txt。
-
-五、使用当前项目进行正式测评
-
-队伍保留自己的实际项目目录、入口、提示词、工具和模型路径，不要求另外打包镜像。
-生成清单时填写当前使用的实际模型和实验Python；无需复制权重。例如：
-
-  "$PY" scripts/make_submission.py --model "$MODEL" --team-id team01 \
-    --submission-id team01-v1 --model-root "$MODELROOT" --python "$PY" \
-    --output submission.json
-  "$PY" scripts/validate_submission.py submission.json --root . --check-files
-
-训练后的模型可用--model-path checkpoints/version2 --adaptation sft指定；也可填写实际
-Linux绝对路径。自定义智能体修改清单entrypoint为自己的参数数组，并保留Console接口。
-在六公开环境先用同一入口自检。模型推理环境可通过入口的--model-python或环境变量指定：
-
-  export SHORE_MODEL_PYTHON="$MPY"
-
-窗口开始后停止编辑代码、提示词和配置，不覆盖本次所用检查点。若复用的模型服务在
-更新权重前已启动，应先让服务重新加载本次权重。评测调用当前项目，不猜测最新目录。
-
-指挥部将九宇宙运行包接入实例后，在本队项目根目录执行固定入口：
-
-  "$PY" scripts/evaluate_submission.py \
-    --organizer-root "$ORGANIZER_ROOT" \
-    --manifest submission.json --output "$ORGANIZER_RESULTS/run01"
-
-ORGANIZER_ROOT由指挥部设为外接九宇宙运行包目录；ORGANIZER_RESULTS为指挥部保留
-运行材料的位置。两者均由指挥部填写，不要求队伍获得该包。可加--check-only检查启动
-清单、路径及运行配置而不调用模型；格式通过不保证模型显存或实际生成成功。
-若入口中使用python且需要指定环境，可加--agent-python "$PY"；显式绝对解释器路径
-则直接按清单执行。当前正式运行从九宇宙中选择Adam、Ramiel、Leliel，分别代表三个档位；其余六个环境和验证数据保留。逐界自动实验、提交law.py/claims.json、
-由指挥部固定积分和评分，不要求人工补交九份规律。
-
-未接入环境时命令明确报organizer_runtime_missing，不尝试下载或用公开世界冒充正式世界。
-正式summary.json及反馈只包含加权总分和本次三个宇宙总分，分项及运行材料由指挥部保留。总分=0.3×Adam+0.4×Ramiel+0.3×Leliel，不将未测宇宙记零。
-窗口结束后由指挥部清理九宇宙环境。六公开成绩不进入正式榜单。
+指挥部在自己保管的环境中读取这两类路径，调用evaluate_strategy.py；正式环境不放入
+队伍项目。队伍程序只通过认证控制台实验，正式运行材料由指挥部保留。
+当前正式测评只运行Adam、Ramiel、Leliel，按0.3/0.4/0.3加权，九个定义和参考全部保留。
+仅反馈本次总分、所测宇宙总分及必要启动/格式错误。六公开开发成绩不进入榜单。
+完整文件职责见PARTICIPANT_FILES.txt，具体接口与多模型示例见STRATEGY_SUBMISSION.txt。

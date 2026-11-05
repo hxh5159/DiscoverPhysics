@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "primary_model_id": "solver",
+  "models": [
+    {
+      "id": "planner",
+      "role": "experiment-planning",
+      "base_model": "Qwen3.8-27B",
+      "path": "checkpoints/planner-v2",
+      "adaptation": "sft"
+    },
+    {
+      "id": "solver",
+      "role": "law-proposal",
+      "base_model": "Qwen3.6-35B-A3B",
+      "path": "checkpoints/solver-v3",
+      "adaptation": "rl"
+    },
+    {
+      "id": "reviewer",
+      "role": "candidate-review",
+      "base_model": "Qwen3.8-27B",
+      "path": "/inspire/hdd/project/26-the-other-shore/public/models/Qwen3.8-27B",
+      "adapter_path": "adapters/reviewer-v1",
+      "adaptation": "sft"
+    }
+  ]
+}

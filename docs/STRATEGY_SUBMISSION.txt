@@ -1,0 +1,90 @@
+策略目录与模型路径提交规范（2026-11-05）
+
+一、每队提交的两类路径
+
+1. agent目录的绝对路径。所有智能体、主循环、提示词、工具、记忆、推理配置及自带代码均在该目录内。
+2. models.json文件的绝对路径。逐项声明本次实际使用的全部底座、完整checkpoint及可选LoRA权重路径。
+
+指挥部保管真实环境、验证数据和评分器，在自己的目录运行。队伍项目不接收正式环境包。
+当前正式测评从九宇宙中运行Adam、Ramiel、Leliel，三个档位权重0.3/0.4/0.3。
+九宇宙定义与参考全部保留，六公开开发宇宙仍全部可用。基础框架默认每界3次模型决策。
+
+二、文件组织
+
+team-project/
+  agent/
+    __init__.py          包入口，可保持为空
+    run.py               统一策略入口，可自行重写；负责全部子智能体的协调
+    strategy.json        schema_version、team_id、submission_id、version
+    models.py            模型部署与客户端，可修改
+    tools.py             候选拟合等工具，可修改
+    tool_worker.py       本队工具工作进程，可修改
+    prompts/             本队提示词，可新增
+    memory/              公开开发得到的合法记忆，可新增
+    configs/             本队配置，可新增
+    agents/              本队多个子智能体，可新增
+  models.json            全部权重的路径清单，权重本体可以位于其他共享盘目录
+  development_worlds/    固定公开开发环境与自测程序
+  rift/、rift_numerics/   固定接口与候选积分器
+  scripts/、docs/        官方启动、检查程序与说明
+
+策略执行所需的相对导入使用agent包命名空间，例如from agent.agents import planner。
+提交策略不能依赖项目根目录另一个自定义.py、外置提示词或未声明权重。
+训练数据和训练程序可在别处组织；正式运行要读取的非权重策略资产应整理进agent/。
+结果目录由运行器通过RIFT_OUTPUT_DIR提供，不将正式运行新记忆写回队伍agent/。
+固定SDK公开可读，指挥部正式运行使用自己校验后的版本。shore_agent/仅为历史入口兼容层。
+
+三、模型清单与多智能体
+
+models.json结构示例见examples/models.json和examples/models.multi.json。
+schema_version为1.0.0，primary_model_id指向默认模型ID，models数组逐项包含唯一id、白名单
+base_model、path，并可包含role、adaptation与adapter_path。完整checkpoint放在path。
+采用LoRA时path指完整底座，adapter_path指适配器目录。每个目录须完成保存且在本窗测评
+期间保持内容稳定。相对模型路径相对models.json所在目录解析；也可直接填共享盘绝对路径。
+所有路径由指挥部逐项预检，无须把397B等大模型重复复制到策略目录。
+
+同一底座训练出不同权重时，分别声明不同ID和各自path；不同LoRA也分别声明自己的ID和
+adapter_path。多个子智能体可以引用同一个ID共享模型，也可以引用不同ID使用不同模型。
+ID、role是队伍自己的分工名称，不对应宇宙类别。一个run.py统筹所有子智能体，指挥部不
+逐个手工运行它们。模型路径清单不自动规定算法或强制同时把所有模型装进显存。
+
+策略从SHORE_MODEL_REGISTRY读取经过预检的清单，调用rift.strategy.load_model_registry
+及model_binding(registry, model_id)按ID选择。默认基础框架使用primary_model_id，也可用
+--model-ref选择其中一个ID。多模型的显存分配、顺序加载或本机服务协作由策略自身处理。
+评测时使用实际配置的权重；已启动服务须对应本窗权重，不能用旧服务冒充新checkpoint。
+
+四、攻坚组开发自检
+
+以下命令在远端Linux项目根目录执行，PY为已装NumPy/SciPy的实验Python。
+MODEL_PYTHON为已配置好的模型推理Python。
+
+  "$PY" scripts/prepare_strategy.py --help
+  "$PY" scripts/validate_strategy.py --agent-dir "$PWD/agent" --models-file "$PWD/models.json" --check-files
+  "$PY" -m development_worlds.runner \
+    --agent-dir "$PWD/agent" --models-file "$PWD/models.json" \
+    --model-python "$MODEL_PYTHON" --max-turns 3 \
+    --output "results/dev-$(date +%Y%m%d-%H%M%S)"
+
+验证检查目录、格式与全部权重文件，不加载大模型，也不证明策略的科学预测能力。
+六公开可反复开发和自测。完整策略和清单应在窗口前用相同入口完成一次启动与交卷自检。
+
+五、指挥部正式运行
+
+真实环境和运行包只放在指挥部私有目录。指挥部管理员读取队伍提交的两类路径，使用
+固定evaluate_strategy.py启动，不再从队伍项目调用或解压正式模拟器。
+策略进程使用独立的无登录测评账号，例如shore-eval，该账号须能读取策略、全部模型、
+适配器和必要依赖，但没有读取真实环境、参考数据及私有评分材料的权限。
+管理员身份用于读取和管理提交，不用于执行不受信任的队伍策略。
+
+  "$PY" "$ORGANIZER_ROOT/evaluate_strategy.py" \
+    --agent-dir /共享盘/队伍目录/agent \
+    --models-file /共享盘/队伍目录/models.json \
+    --run-as shore-eval --agent-python "$PY" \
+    --output "$ORGANIZER_RESULTS/window1-team01"
+
+加--check-only可先核验全部路径、账号权限和固定配置，不调用模型或发布科学成绩。
+run-as、实验Python、结果根目录是指挥部统一环境配置；每队提交的信息仍只有上述两类路径。
+部署账号与目录权限的完整步骤见指挥部包README_策略路径测评.txt。
+测评期间禁止修改本次策略、配置或权重。指挥部留存运行材料，只返回总分、所测各宇宙
+总分及必要启动/格式错误。第一束光、实验配额、600秒、law.py/claims.json和计分公式
+均按现行契约执行。四窗口受理由指挥部管理，历史成绩不拼接。

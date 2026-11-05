@@ -1,11 +1,11 @@
 {
-  "runtime_version": "1.5.0",
+  "runtime_version": "1.6.0",
   "updated": "2026-11-05",
-  "status": "direct_project_execution_with_external_organizer_runtime",
+  "status": "organizer_owned_environment_with_strategy_and_model_paths",
   "outer_submission": {
-    "manifest_schema": "submission.schema.json",
-    "identity": "本次使用队伍当前项目、清单、配置及已保存模型；测评期间禁止编辑和改写所用权重，无须复制项目或制作镜像",
-    "entrypoint": "清单entrypoint参数数组，工作目录为队伍实际项目目录；shell=False直接执行，解释器用清单绝对路径或--agent-python",
+    "manifest_schema": "strategy.schema.json + model_registry.schema.json",
+    "identity": "提交agent目录与models.json两类路径；测评期间停止修改策略、配置及所用权重",
+    "entrypoint": "固定启动器以agent包加载提交的agent/run.py；全部子智能体在该入口内协调",
     "world_order": [
       "Adam",
       "Ramiel",
@@ -24,7 +24,9 @@
       "Leliel",
       "Arael",
       "Lilin"
-    ]
+    ],
+    "strategy_assets": "全部自定义运行代码、提示词、推理配置和合法记忆位于agent目录；权重本体使用清单路径",
+    "model_binding": "所有模型使用唯一ID，完整checkpoint或底座加adapter_path逐项预检；相对路径基于models.json父目录"
   },
   "session": {
     "console_protocol_version": "1.0.0",
@@ -47,7 +49,7 @@
   "communication": {
     "agent": "官方认证的本机HTTP JSON控制台；Unix socket保留兼容，同一认证协议，非外部API",
     "law": "只接受允许的测试初态和时刻，不含控制台凭证，不联网或读写文件",
-    "actual_permission_isolation": "当前采用队伍项目直接运行及测评期间禁止编辑的现场管理方式，不以本地进程或目录名称声称文件系统隔离"
+    "actual_permission_isolation": "管理员持有私有环境，策略进程使用不同的独立无登录普通账号；私有运行目录须由管理员拥有且权限0700，公开SDK另行提供。真实Linux账号与文件权限须在目标实例预检。"
   },
   "artifacts": {
     "per_world": [
@@ -71,7 +73,7 @@
     "manual_intervention_during_evaluation": false
   },
   "queue_and_ranking": {
-    "scope": "直接运行记录与工程诊断明确区分；四窗口受理次数由指挥部管理，最终按最高完整所选三界成绩排名",
+    "scope": "指挥部私有运行与工程诊断分开；四窗口受理次数由指挥部管理，最终按最高完整三界成绩排名",
     "deadline_basis": "成功受理时间，截止前受理的版本可在截止后完成评测",
     "deadline_persisted": true,
     "infrastructure_failure": "保留原受理版本，修复后重评，不当作候选科学失败",
@@ -94,5 +96,15 @@
     "exploration_wall_clock_seconds": 600,
     "profile": "direct-v1-r3",
     "semantics": "启动、候选执行和关闭为运行护栏，不改变从首次mission起的600秒探索"
+  },
+  "strategy_path_submission": {
+    "agent_directory_name": "agent",
+    "descriptor": "strategy.json",
+    "fixed_entry": "run.py",
+    "model_registry": "models.json",
+    "roles_and_multiple_checkpoints_supported": true,
+    "organizer_entry": "evaluate_strategy.py",
+    "organizer_environment_copied_into_team_project": false,
+    "untrusted_strategy_runs_as_admin": false
   }
 }

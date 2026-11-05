@@ -1,10 +1,17 @@
+当前路径提交规范（2026-11-05）
+正式策略统一放在agent/，权重通过models.json逐项提交。指挥部管理员在私有环境直接读取
+agent目录与模型清单两类路径，调用evaluate_strategy.py，以独立测评账号运行队伍策略。
+多个子智能体均由agent/run.py协调，全部策略、提示词、记忆和推理配置位于agent/。
+九隐藏环境保留在指挥部，不放入队伍项目。当前只测Adam、Ramiel、Leliel，基础框架默认3轮。
+具体字段和统一命令以STRATEGY_SUBMISSION.txt为准。旧镜像与submission.json接口仅作历史兼容。
+
 彼岸物理规律发现挑战赛：代码分工与提交技术规范
 任务编号：SHORE-PLM-001
 整理日期：2026-11-03
 文档版本：1.2.0（直接项目运行）
 
 本文件整理现有规则及已实现接口，不另行修改计分、配额或模型范围。
-这是详细技术附件，不替代任务背景说明。正式测评在队伍当前项目直接运行，模型与依赖提前配置。
+这是详细技术附件，不替代任务背景说明。正式测评在指挥部私有目录按提交路径运行，模型与依赖提前配置。
 以下“固定”指指挥部正式运行所使用的版本；攻坚组不能用自己修改的副本替换它。
 
 一、任务与代码分工
@@ -19,10 +26,10 @@
 3. 指挥部专属代码与数据：九正式宇宙模拟器、真实参数、验证数据、正确声明及正式评测后台。
 
 公开候选积分器只积分“攻坚组提出的规律”，不包含九个宇宙的真实规律。
-九正式宇宙的真实模拟器源码不随参赛包发放；测评窗口由指挥部接入，不交给队员阅读。
+九正式宇宙的真实模拟器源码不随参赛包发放；由指挥部保管并运行，不放入队伍项目或交给队员阅读。
 
 六公开开发环境的真实模拟器和自测评分全部提供，见development_worlds/。
-其service/runner与正式端使用相同Console及law.py/claims提交生命周期。可从shore_agent/
+其service/runner与正式端使用相同Console及law.py/claims提交生命周期。可从agent/
 基础框架直接开始，或修改、替换该框架；QUICKSTART.txt给出加载本地模型后的完整命令。
 
 二、公开包中哪些文件可以改，哪些必须固定
@@ -31,17 +38,15 @@
 
 【A类：可以复制、改写或自行替换的模板】
 
-examples/agent.py
-  转发到shore_agent.agent的可运行入口。攻坚组可修改现有主循环、模型推理及工具，或自行替换。
-  agent.py只是示例文件名，实际启动入口由submission.json中的entrypoint确定。
-  不强制要求Agent类或act方法。
+agent/
+  完整可修改策略目录，包含统一入口run.py、全部子智能体、提示词、工具、配置和合法记忆。
+  提供模型调用、实验主循环、候选检验和PARAMS拟合；可自行重写，但运行资产仍须在agent内。
+  基础策略不读取真实模拟器或验证答案，输出完整law.py，不只提交数学表达式。
 
-shore_agent/
-  提供模型调用、实验主循环、提示词、上下文、候选检验和PARAMS拟合工具。
-  基础agent不读取真实模拟器或验证答案，输出完整law.py程序；不是只交JSON数学表达式。
-
-examples/submission.json
-  外层提交清单模板。按本组身份、入口、版本和模型路径填写，字段结构不能自行改变。
+agent/strategy.json、models.json
+  前者填写本组身份及本窗版本；后者按唯一ID列出每个模型的完整权重和可选适配器路径。
+  models.json可位于agent外，权重可在其他共享目录。schema与示例见STRATEGY_SUBMISSION.txt。
+  shore_agent/和examples/agent.py是历史兼容入口，不作为当前可修改策略位置。
 
 examples/law.py
   候选规律接口示例。实际参赛时由智能体为当前宇宙生成自己的law.py。
@@ -125,37 +130,30 @@ START_HERE.txt、starter-manifest.json、LICENSE
     weights/               可选：本组合法形成的权重或适配器
     results/               可选：六公开宇宙开发记录
 
-正式运行的工作目录是队伍当前项目目录；实际入口可以是自编文件或Python模块。
+正式启动器装载提交的agent/run.py，策略目录与指挥部环境目录独立。
 每个宇宙运行时，智能体在RIFT_OUTPUT_DIR内写出law.py和claims.json，再通过控制台上传。
 本组临时文件、已有合法观测与模型成果可以按规则使用；它们不是额外评分项目。
 report.md可选，不以自然语言报告或代码风格加分。
 技术说明、训练说明不是当前机器清单的必填项；本文件不增设这类必交材料。
 
-四、外层提交：交的是可运行智能体，而不只是九份答案
+四、外层提交：策略目录和模型路径清单
 
-外层准备是本队可运行项目与submission.json。指挥部确认本次入口和模型配置后，完整运行本次所选三个宇宙；基础框架在公开与正式环境均默认最多3次模型决策，最后一轮优先交卷。
-测评期间禁止编辑项目文件和改写所用权重，无需另复制项目或制作队伍运行镜像。
-每个宇宙的law.py与claims.json是在该次运行中由智能体生成并提交的内层产物。
-不能用预先上传的轨迹文件替代这两层接口。
+每队提交agent目录及models.json文件两类绝对路径。全部运行时策略资产在agent内，
+包括多个智能体的协调逻辑、提示词、工具、推理配置和合法开发记忆。统一入口为run.py。
+agent/strategy.json只填写schema_version、submission_id、team_id、version。
+models.json包含schema_version、primary_model_id及models数组；每项填写唯一id、白名单
+base_model和path，可填写role、adaptation及adapter_path。完整checkpoint用path；
+LoRA同时给底座path和适配器adapter_path。所有条目均由指挥部预检。
 
-submission.json当前有六个必填根字段：
-  schema_version：使用模板规定的接口版本，当前为1.0.0。
-  submission_id：本次提交标识。
-  team_id：本组身份，须与受理身份一致。
-  version：本组提交版本说明。
-  entrypoint：启动命令的参数数组，例如["python", "agent.py"]。
-  models：使用的模型列表，必须非空。
+同底座的多份训练结果分别声明，子智能体按ID引用。相对路径以models.json父目录为准，
+也可填实际Linux绝对路径。具体结构、多模型例子及准备命令见STRATEGY_SUBMISSION.txt。
+清单规范化不代表已核验权重来源。测评期间禁止修改本次策略、配置或所用检查点。
+多个子智能体由本队统一入口协调，指挥部不逐队定制启动命令。
 
-根字段不接受自行增加的未知项。entrypoint直接执行，不使用shell命令字符串或shell包装入口。
-每个models条目必须有base_model和path；revision、sha256、adaptation可选。
-base_model必须属于当前白名单；path为项目内POSIX相对路径或实例实际Linux绝对模型路径。
-清单不授予额外文件权限；写了模型名称不等于完成来源核验。公共底座可直接引用原路径，
-完整检查点或底座加adapter由队伍入口按其实际配置加载，不需容器路径映射。
-
-本组可以在开发阶段反复修改程序。测评窗口开始后暂停编辑，指挥部直接使用本次项目与
-模型版本运行。六公开开发不限自测次数；四个正式窗口的受理次数由指挥部管理。
-固定命令为scripts/evaluate_submission.py --organizer-root <指挥部运行包> --output <本次结果目录>，
-可用--manifest、--project-root、--agent-python明确当前清单、项目和实验解释器。
+指挥部在私有目录运行evaluate_strategy.py --agent-dir <策略目录> --models-file <模型清单>
+--run-as <专用普通账号> --output <新结果目录>。真实环境留在指挥部，不复制进队伍项目。
+策略进程使用固定公开SDK和认证控制台；隐藏材料赛中不归还。
+每个宇宙的law.py与claims.json由策略自动生成并配对交卷，不能以预计算轨迹替代。
 
 五、智能体的运行入口与控制台
 
@@ -276,7 +274,7 @@ claims.json仅含以下三个字段，不增加自然语言判分项：
 九、一整次运行的顺序与交卷
 
 1. 攻坚组在六公开环境开发和自测，填写当前程序入口、实际模型路径及解释器。
-2. 测评开始后停止编辑，由指挥部接入九宇宙包，在本队项目目录执行统一入口。
+2. 测评开始后停止编辑，指挥部在自己的私有环境按agent和models.json路径执行统一入口。
 3. 每局新建独立会话、配额及产物目录，向智能体注入本局环境变量。
 4. 智能体mission后，循环进行真实实验、分析、候选拟合和固定积分检验。
 5. 智能体可多次save_draft；最后调用submit，提交同一份law.py/claims.json有效配对。
@@ -344,12 +342,12 @@ V使用该宇宙同一套固定无噪验证真值的总体位置方差，不根�
 
 攻坚组可读取：公开文档与固定组件、本组代码、授权白名单权重、本组合法数据及控制台响应。
 攻坚组可写入：本组开发文件，以及正式运行时本局指定输出和允许的临时目录。
-指挥部固定SDK、数值实现和最终评分代码；本队可改代码与模型配置直接从项目读取。
+指挥部固定SDK、数值实现和最终评分代码；本队可改代码从agent目录读取，全部模型配置来自提交的路径清单。
 本组训练产生的新权重/适配器保存到本组可写位置，不修改指挥部公共权重副本。
 
 真实实验在指挥部私有服务中运行，智能体只访问获准控制台通道。
 正式候选执行只取得冻结law.py、官方数学运行环境及允许的测试输入，不取得控制台令牌、
-通信通道、模型权重或私有真值。候选和模拟器分进程；不以直接项目运行声称文件系统隔离。
+通信通道、模型权重或私有真值。候选和模拟器分进程；正式策略进程使用专用普通UID，指挥部真实环境由管理员目录权限保护。
 
 禁止外网和外部API；官方控制台通信是获准通道。
 禁止白名单以外权重，包括用非白名单模型或其API生成训练数据蒸馏。
@@ -371,7 +369,7 @@ Kimi CLI等。禁止读取或探测控制台内部实现、绕过计费和时间
 十二、提交前自检与运行检查
 
 在远端项目或公开起步包根目录执行：
-  python scripts/validate_submission.py examples/submission.json
+  python scripts/validate_strategy.py --agent-dir agent --models-file models.json --check-files
   python scripts/validate_law.py examples/law.py --claims docs/contracts/claims.example.json
   python scripts/validate_law.py examples/law.py --case examples/law_case.json --execute
 

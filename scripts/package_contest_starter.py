@@ -12,32 +12,37 @@ PUBLIC_FILES = (
     "LICENSE",
     "rift/__init__.py", "rift/console.py", "rift/submission.py", "rift/law.py",
     "rift/observations.py", "rift/prediction.py", "rift/worker.py",
-    "rift/model_registry.py", "rift/model_catalog.json",
+    "rift/model_registry.py", "rift/model_catalog.json", "rift/strategy.py",
     "rift_numerics/__init__.py", "rift_numerics/rollout.py",
     "shore_agent/__init__.py", "shore_agent/agent.py", "shore_agent/models.py",
     "shore_agent/tools.py", "shore_agent/tool_worker.py",
+    "agent/__init__.py", "agent/run.py", "agent/models.py", "agent/tools.py",
+    "agent/tool_worker.py", "agent/strategy.json", "models.json",
     "development_worlds/__init__.py", "development_worlds/worlds.py",
     "development_worlds/catalog.py", "development_worlds/console.py",
     "development_worlds/evaluation.py", "development_worlds/service.py",
     "development_worlds/runner.py", "development_worlds/README.md",
     "scripts/__init__.py", "scripts/validate_claims.py", "scripts/validate_law.py", "scripts/validate_submission.py",
     "scripts/serve_model.py", "scripts/build_runtime_images.py", "scripts/make_submission.py",
-    "scripts/evaluate_submission.py",
+    "scripts/evaluate_submission.py", "scripts/run_strategy.py", "scripts/prepare_strategy.py",
+    "scripts/validate_strategy.py",
     "scripts/bootstrap_cuda128.sh", "scripts/prepare_h200_offline_cache.py",
     "scripts/pip_index_install.py", "scripts/prepare_vllm_dependencies.py", "scripts/preflight_cuda128_build.py",
     "scripts/prepare_torch_wheel.py",
     "scripts/verify_h200_cuda128.py", "requirements.txt",
     "docs/LAW_API.txt", "docs/CONSOLE_API.txt", "docs/SUBMISSION_API.txt", "docs/CONTEST_WORKFLOW.txt",
-    "docs/QUICKSTART.txt", "docs/PARTICIPANT_FILES.txt", "docs/MODEL_RUNTIME.txt", "docs/MODELS.txt",
+    "docs/QUICKSTART.txt", "docs/PARTICIPANT_FILES.txt", "docs/STRATEGY_SUBMISSION.txt", "docs/MODEL_RUNTIME.txt", "docs/MODELS.txt",
     "docs/CODE_AND_SUBMISSION_SPEC.txt", "docs/彼岸物理规律发现挑战赛_赛题说明_更新版.pdf",
     "docs/H200_OFFLINE_SETUP.txt", "docs/CUDA128_SETUP.txt",
     "docs/contracts/claims.schema.json", "docs/contracts/claims.example.json",
     "docs/contracts/law_api.json", "docs/contracts/law_case.schema.json",
     "docs/contracts/numerics.json", "docs/contracts/submission.schema.json", "docs/contracts/runtime.json",
+    "docs/contracts/strategy.schema.json", "docs/contracts/model_registry.schema.json",
     "docs/contracts/exploration_protocol.json", "docs/contracts/observation_noise.json",
     "docs/contracts/scoring.json", "docs/contracts/feedback.schema.json",
     "examples/agent.py", "examples/submission.json", "examples/law.py", "examples/law_case.json", "examples/Dockerfile.agent",
     "examples/Dockerfile.candidate",
+    "examples/models.json", "examples/models.multi.json",
 )
 PUBLIC_NUMERICS_FIELDS = (
     "numerics_version", "integrator", "dt", "dtype", "sampling", "softening",
@@ -55,15 +60,15 @@ START_HERE = '''攻坚组开发与实验起步包
   python scripts/validate_law.py examples/law.py --case examples/law_case.json --execute
 
 模型准备后，从本包根目录运行python -m development_worlds.runner --help。
-实际默认入口python -m shore_agent.agent会加载所选本地模型并自动探索；没有模型就明确报错。
+完整可修改策略在agent/，统一入口为agent/run.py；models.json逐项声明本次全部模型权重路径。
 基础框架每个宇宙默认最多3次模型决策，最后一轮优先提交law.py与claims.json。
 公开开发驱动和正式驱动使用相同Console及law.py/claims.json提交接口。
-提交根目录为包含shore_agent、rift和提交清单的完整工作区，不再只复制examples目录。
-正式测评直接运行本队当前项目；测评期间停止编辑代码、配置及所用权重。
+每队提交agent目录与models.json两类绝对路径。多个子智能体由agent/run.py统一协调。
+正式测评由指挥部管理员按路径读取；测评期间停止编辑代码、配置及所用权重。
 模型从本队配置的实际目录加载，正式控制台地址及会话令牌由指挥部运行器提供。
-九宇宙环境由指挥部接入后，使用scripts/evaluate_submission.py统一启动；
+九宇宙环境保留在指挥部私有目录，使用指挥部evaluate_strategy.py统一启动；
 当前测评选择Adam、Ramiel、Leliel三个宇宙，其余六个宇宙定义和验证数据保留。
-正式模拟、固定积分评分和隐藏运行材料由指挥部管理，不要求重新封装本队镜像。
+正式模拟、固定积分评分和隐藏运行材料由指挥部管理。详见docs/STRATEGY_SUBMISSION.txt。
 本包不含正式九宇宙的真实模拟器、定律参数或隐藏验证真值，也不附带权重和凭证。
 六公开运行的观测及日志可保留；九隐藏运行材料由指挥部保留，赛中只返回规定成绩和必要错误。
 '''
@@ -129,8 +134,10 @@ def build_starter(output, *, root=ROOT, overwrite=False):
                 "contains_public_development_worlds": True, "public_worlds": ["1", "2", "3", "4", "5", "6"],
                 "contains_editable_llm_baseline": True,
                 "contains_model_weights": False,
-                "formal_execution_mode": "direct_project",
-                "formal_entrypoint": "scripts/evaluate_submission.py",
+                "formal_execution_mode": "organizer_strategy_paths",
+                "formal_entrypoint": "organizer evaluate_strategy.py",
+                "editable_strategy_directory": "agent",
+                "model_registry": "models.json",
                 "formal_evaluation_worlds": ["Adam", "Ramiel", "Leliel"],
                 "baseline_max_turns": 3,
                 "requires_external_organizer_runtime": True,

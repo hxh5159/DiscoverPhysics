@@ -123,16 +123,35 @@ def main(argv=None):
     parser.add_argument("--max-tokens", type=int, default=4096)
     parser.add_argument("--max-turns", type=int, default=3,
                         help="Maximum baseline model calls per universe (default 3); zero removes this cap.")
+    parser.add_argument("--agent-dir", type=Path,
+                        help="Complete agent/ directory containing strategy.json and run.py.")
+    parser.add_argument("--models-file", type=Path,
+                        help="Model registry paired with --agent-dir; includes every model or adapter path.")
     parser.add_argument("--agent-command", nargs=argparse.REMAINDER,
                         help="Optional custom command argument list; put this option last.")
     args = parser.parse_args(argv)
     if args.seed < 0 or args.max_turns < 0 or not 0 < args.startup_timeout < float("inf"):
         parser.error("seed and max-turns must be nonnegative; startup timeout must be finite and positive.")
+    if bool(args.agent_dir) != bool(args.models_file):
+        parser.error('--agent-dir and --models-file must be supplied together.')
+    if args.agent_dir and args.agent_command:
+        parser.error('--agent-command cannot be combined with the strategy directory options.')
     if args.output.exists():
         parser.error("Choose a new output directory; prior runs are not overwritten.")
-    command = args.agent_command or [sys.executable, "-m", "shore_agent.agent", "--model", args.model,
+    command = args.agent_command or [sys.executable, "-m", "agent.run", "--model", args.model,
         "--tp-size", str(args.tp_size), "--max-tokens", str(args.max_tokens),
         "--startup-timeout", str(args.startup_timeout), "--max-turns", str(args.max_turns)]
+    if args.agent_dir:
+        from rift.strategy import load_strategy_submission
+        try:
+            load_strategy_submission(args.agent_dir, args.models_file, check_files=True)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
+        command = [sys.executable, '-I', str(ROOT/'scripts/run_strategy.py'),
+            '--agent-dir', str(args.agent_dir.expanduser().resolve()),
+            '--models-file', str(args.models_file.expanduser().resolve()), '--',
+            '--max-turns', str(args.max_turns), '--max-tokens', str(args.max_tokens),
+            '--startup-timeout', str(args.startup_timeout), '--tp-size', str(args.tp_size)]
     if not args.agent_command:
         for key in ("base_url", "model_id", "model_root", "model_path", "model_python"):
             value = getattr(args, key)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 
@@ -16,7 +17,7 @@ from .model_registry import WHITELIST_MODELS, canonical_base_model
 
 SUBMISSION_SCHEMA_VERSION = "1.0.0"
 _ROOT_FIELDS = frozenset(("schema_version", "submission_id", "team_id", "version", "entrypoint", "models"))
-_MODEL_FIELDS = frozenset(("base_model", "path", "revision", "sha256", "adaptation"))
+_MODEL_FIELDS = frozenset(("base_model", "path", "revision", "sha256", "adaptation", "id", "role", "adapter_path"))
 _ADAPTATIONS = frozenset(("base", "quantized", "sft", "rl", "other"))
 _IDENTIFIER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}\Z")
 _SHA256 = re.compile(r"[0-9a-fA-F]{64}\Z")
@@ -51,7 +52,8 @@ def _keys(value, allowed, required, path):
 
 def _model_path(value, path):
     value = _text(value, path)
-    if "\\" in value or ":" in value:
+    native_windows = os.name == "nt" and value.count(":") == 1 and re.match(r"^[A-Za-z]:/", value)
+    if "\\" in value or (":" in value and not native_windows):
         raise SubmissionError(path, "Use a relative POSIX path or an absolute Linux model path.")
     parts = value.split("/")
     if ".." in parts or "." in parts or "" in parts[1:]:
@@ -87,6 +89,7 @@ def validate_manifest(value):
     if not isinstance(models, list) or not models:
         raise SubmissionError("$.models", "Declare at least one model from the published whitelist.")
     normalized = []
+    model_ids = set()
     for i, item in enumerate(models):
         path = f"$.models[{i}]"
         _keys(item, _MODEL_FIELDS, ("base_model", "path"), path)
@@ -95,6 +98,16 @@ def validate_manifest(value):
         except ValueError:
             raise SubmissionError(path + ".base_model", "Expected a model identifier from the published whitelist.")
         model = {"base_model": base_model, "path": _model_path(item["path"], path + ".path")}
+        if "id" in item:
+            identifier = _text(item["id"], path + ".id", 64)
+            if not _IDENTIFIER.fullmatch(identifier) or identifier in model_ids:
+                raise SubmissionError(path + ".id", "Model binding IDs must be unique ASCII identifiers.")
+            model_ids.add(identifier)
+            model["id"] = identifier
+        if "role" in item:
+            model["role"] = _text(item["role"], path + ".role", 128)
+        if "adapter_path" in item:
+            model["adapter_path"] = _model_path(item["adapter_path"], path + ".adapter_path")
         if "revision" in item:
             model["revision"] = _text(item["revision"], path + ".revision", 256)
         if "sha256" in item:
@@ -196,16 +209,17 @@ def check_submission_files(value, root):
     for i, model in enumerate(value["models"]):
         item = {"path": model["path"], "sha256_verified": False}
         declared = PurePosixPath(model["path"])
+        absolute = declared.is_absolute() or Path(model["path"]).is_absolute()
         if declared.is_absolute() and declared.parts[1] == "models":
             item["status"] = "official_mount_check_deferred"
         else:
-            lexical = Path(model["path"]) if declared.is_absolute() else root.joinpath(*declared.parts)
+            lexical = Path(model["path"]) if absolute else root.joinpath(*declared.parts)
             resolved = lexical.resolve()
-            if not declared.is_absolute() and not resolved.is_relative_to(root):
+            if not absolute and not resolved.is_relative_to(root):
                 raise SubmissionError(f"$.models[{i}].path", "Model artifact resolves outside the submission root.")
             # Relative packaged artifacts must stay within the project. An
             # explicitly named host checkpoint may use a platform path alias.
-            if not declared.is_absolute():
+            if not absolute:
                 current = root
                 for part in declared.parts:
                     current = current / part
@@ -213,12 +227,25 @@ def check_submission_files(value, root):
                         raise SubmissionError(f"$.models[{i}].path", "Packaged model paths must not use symlinks.")
             if not resolved.exists():
                 raise SubmissionError(f"$.models[{i}].path", "Declared local model artifact does not exist.")
-            item["status"] = "host_artifact_exists" if declared.is_absolute() else "local_artifact_exists"
+            item["status"] = "host_artifact_exists" if absolute else "local_artifact_exists"
             if "sha256" in model:
                 actual = artifact_digest(resolved)
                 if actual != model["sha256"]:
                     raise SubmissionError(f"$.models[{i}].sha256", "Model artifact SHA-256 does not match the declaration.")
                 item["sha256_verified"] = True
+        if "adapter_path" in model:
+            declared_adapter = Path(model["adapter_path"])
+            adapter = declared_adapter if declared_adapter.is_absolute() else root/declared_adapter
+            adapter = adapter.resolve()
+            if not declared_adapter.is_absolute() and not adapter.is_relative_to(root):
+                raise SubmissionError(f"$.models[{i}].adapter_path", "Adapter resolves outside the submission root.")
+            if not adapter.is_dir() or not (adapter/"adapter_config.json").is_file():
+                raise SubmissionError(f"$.models[{i}].adapter_path", "Adapter directory and adapter_config.json are required.")
+            if not any((adapter/name).is_file() and (adapter/name).stat().st_size > 0
+                       for name in ("adapter_model.safetensors", "adapter_model.bin")):
+                raise SubmissionError(f"$.models[{i}].adapter_path", "Adapter weights are missing or empty.")
+            item["adapter_path"] = str(adapter)
+            item["adapter_checked"] = True
         checked.append(item)
     return checked
 

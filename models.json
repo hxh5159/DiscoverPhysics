@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "primary_model_id": "solver",
+  "models": [
+    {
+      "id": "solver",
+      "role": "discovery",
+      "base_model": "Qwen3.8-27B",
+      "path": "/inspire/hdd/project/26-the-other-shore/public/models/Qwen3.8-27B",
+      "adaptation": "base"
+    }
+  ]
+}

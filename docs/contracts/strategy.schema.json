@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:shore:strategy:1.0.0",
+  "title": "攻坚组策略目录描述",
+  "description": "完整策略置于agent目录，固定入口agent/run.py。标识文件不接受任意启动命令、外部模块路径或环境变量。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "team_id",
+    "submission_id",
+    "version"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "team_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+    },
+    "submission_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  }
+}
