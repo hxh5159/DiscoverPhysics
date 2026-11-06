@@ -1670,7 +1670,7 @@ agent/models.py增加显式可选SHORE_STRUCTURED_OUTPUT=json_schema，默认off
 ### 7.113 从发放包移除14份重复说明（2026-11-06）
 
 - 用户指出关键内容已合并README，无需在参赛包继续保留旧TXT。已从参赛者及组织包公开部分移除7.112列出的14份说明，包内根README作为操作入口，PDF保留；源码手册作为内部历史资料保留，不删除程序、JSON、依赖、许可证或示例。
-- 主packager不再将13份源手册列入必需名单，也不再生成START_HERE；两条既有打包测试断言同步。所有保留运行成员与上一包逐字节比较，重建FILE_LIST及必要包记录，并将剩余指挥部说明中指向已删手册的两处导航改为README入口；README、PDF、实际运行/科学/评分代码及profile原字节不变。指挥部包内participant_packager及组合包的delivery_revision只作包装层同步，不改变策略或数值协议。
+- 主packager不再将13份源手册列入必需名单，也不再生成START_HERE；两条既有打包测试断言同步。所有保留运行成员与上一包逐字节比较，重建FILE_LIST及必要包记录，并将剩余指挥部说明中指向已删手册的两类导航改为README入口；README、PDF、实际运行/科学/评分代码及profile原字节不变。指挥部包内participant_packager及组合包的delivery_revision只作包装层同步，不改变策略或数值协议。
 - 新参赛包starter-v16为76成员；新指挥部包runtime-strategy-v6使用原strategy-v5运行profile；组合测试包为r21，文档修订16，旧包原字节归档。新旧文件名/默认解压目录区分，避免覆盖解压留下旧说明。prepare_test_bundle原有拒绝删源成员的refresh保护保持；已解压v15或旧测试目录须选择新空target，不能就地覆盖或放宽保护。
 - 原先自动加载器锁cu128、跨模型三轮计数未强制、隐藏运行写回隔离未实现和机器契约披露实际选集的问题不属于本次文档删减，未借打包变更宣称已解决。无新增模型调用、真实物理模拟或成绩。
 
