@@ -23,6 +23,9 @@ from scripts.validate_claims import validate_claims
 from .tools import candidate_tool
 from .models import InferenceError
 
+MAX_BATCH_ACTIONS = 8
+TOOL_ACTIONS = frozenset(("observe", "launch", "archive", "view_record", "check", "fit", "draft", "submit"))
+
 
 SYSTEM_PROMPT = """你是自动物理规律发现智能体。在未知二维环境中通过允许的观测建立可预测探针轨迹的规律。
 任务名不告诉你真实规律。你只能使用任务包和合法实验，不读取任何环境实现或隐藏验证。
@@ -35,8 +38,10 @@ SYSTEM_PROMPT = """你是自动物理规律发现智能体。在未知二维环�
 {"action":"fit","law":"完整Python源代码","max_nfev":12}
 {"action":"draft","law":"完整Python源代码","claims":{"dynamics_order":2,"hidden_matter":false,"time_dependence":false}}
 {"action":"submit","law":"完整Python源代码","claims":{"dynamics_order":2,"hidden_matter":false,"time_dependence":false}}
+check/fit也可用"law_ref":"saved"代替law引用当前已保存候选。fit成功后，若输入law与已保存law相同，自动保存拟合返回的law及原claims；若显式提供claims则采用经格式校验的新声明。不同law没有显式claims时只返回拟合结果，不覆盖已保存配对。draft/submit也支持law_ref:"saved"，省略claims时复用该配对声明；没有有效配对时不能使用此引用。law和law_ref不能同时给出。
+可以显式返回{"action":"batch","actions":[子动作1,子动作2]}，一次模型回复顺序执行1至8个动作；不能嵌套batch，submit只能放最后。每个实验照常计费、受原时间和配额限制；子动作失败即停止余下动作，保留最近有效草稿。批量内没有额外模型调用，也不会替你选实验、改规律或填写声明。
 所有坐标、属性和时刻按mission公开目录选择，不能把示例数字当作合法范围。source_properties与每个probe.properties须包含该宇宙目录的所有键，默认值见目录。物理时刻必须对齐0.005；t_launch为绝对物理时刻，readout为相对偏移。探针互不作用且不影响背景，但会自由运动。
-初始first_light包含合法探针轨迹和可见背景；每次新探针收费1，observe免费但有独立次数；位置和速度有观测噪声。根据轨迹、方向、属性和投放相位辨别规律，不要直接差分噪声位置后过拟合。实验设计、推理、拟合均消耗本局现实时间。请尽早保存有效draft再改进；submit结束本局。
+初始first_light包含合法探针轨迹和可见背景，已在MISSION中直接提供；当前8个时刻不会抽稀，不必先view_record才能使用。每次新探针收费1，observe免费但有独立次数；位置和速度有观测噪声。根据轨迹、方向、属性和投放相位辨别规律，不要直接差分噪声位置后过拟合。实验设计、推理、拟合均消耗本局现实时间。请保存有效draft再改进；是否追加实验由你判断，submit结束本局。
 law.py须包含import numpy as np、LAW_API_VERSION='1.0.0'、PARAMS={至多5个有限标量}及def acceleration(t,bodies,params)。可用math/numpy/scipy纯数学；禁止IO、随机、联网。元数据必须字面量。可选BODY_PROPS按可见ID提供未知标量属性，可选HIDDEN列出候选隐藏对象初态，但不增加claims字段。
 每个body是只读字典，键id、kind(background/hidden/probe)、pos二维数组、vel二维数组、properties标量字典。加速度须返回(len(bodies),2)有限实数数组。回调可能仅含背景/候选隐藏对象，也可能额外含一枚探针。背景的真实作用角色未知，不能默认所有背景都被固定，或默认它们均有相同源强。你负责返回这些对象的候选加速度；官方积分器统一推进背景再投放探针。
 check/fit工具仅在已有观测上调用固定积分器；不会查询真实模拟器或隐藏测试。fit只优化你在PARAMS中提出的标量，不能替你提出结构。工具残差是带噪观测拟合误差，不是正式分数。若你把未知常数写死在函数中，fit不能优化它。
@@ -104,6 +109,7 @@ class DiscoveryAgent:
         self.mission = None
         self.records, self.events, self.history = [], [], []
         self.latest = None
+        self.candidate_count = 0
         self.deadline = None
         self.last_budget = None
 
@@ -131,7 +137,8 @@ class DiscoveryAgent:
             raise TimeoutError("Exploration ended before candidate preparation.")
         # Separate filenames ensure an invalid revision never replaces our
         # last locally accepted pair. The service also checks atomically.
-        number = len(self.events)+1
+        self.candidate_count += 1
+        number = self.candidate_count
         law = self.directory/f"candidate-{number:04d}.py"
         claim_file = self.directory/f"candidate-{number:04d}.claims.json"
         law.write_text(source, encoding="utf-8")
@@ -140,15 +147,64 @@ class DiscoveryAgent:
             raise TimeoutError("Exploration ended before artifact submission.")
         method = self.console.submit if submit else self.console.save_draft
         result = method(law=str(law), claims=str(claim_file))
-        self.latest = {"law": source, "claims": claims}
+        self.latest = {"law": source, "claims": json.loads(_json(claims))}
         (self.directory/"law.py").write_text(source, encoding="utf-8")
         self._save_json("claims.json", claims)
         return result
+
+    def _candidate_source(self, action):
+        if "law" in action and "law_ref" in action:
+            raise ValueError("Specify law or law_ref, not both.")
+        if "law_ref" in action:
+            if action["law_ref"] != "saved":
+                raise ValueError("law_ref must be saved.")
+            if self.latest is None:
+                raise ValueError("No valid saved candidate is available.")
+            return self.latest["law"]
+        if not isinstance(action.get("law"), str):
+            raise ValueError("Provide complete law source or law_ref: saved.")
+        return action["law"]
+
+    def _candidate_claims(self, action, source):
+        if "claims" in action:
+            return validate_claims(action["claims"])
+        if self.latest is not None and source == self.latest["law"]:
+            return json.loads(_json(self.latest["claims"]))
+        return None
+
+    def _batch(self, action):
+        actions = action.get("actions")
+        if not isinstance(actions, list) or not 1 <= len(actions) <= MAX_BATCH_ACTIONS:
+            raise ValueError(f"batch requires 1 through {MAX_BATCH_ACTIONS} actions.")
+        # Validate the whole envelope before any experiment can be charged.
+        for index, child in enumerate(actions):
+            if not isinstance(child, dict) or child.get("action") not in TOOL_ACTIONS:
+                raise ValueError("Batch children must be supported non-batch actions.")
+            if child["action"] == "submit" and index != len(actions)-1:
+                raise ValueError("submit must be the final batch action.")
+        rows = []
+        for index, child in enumerate(actions):
+            row = {"index": index, "action": child["action"]}
+            try:
+                result = self._action(child)
+                row["result"] = result
+                failed = isinstance(result, dict) and result.get("ok") is False
+            except Exception as exc:
+                row["error"] = f"{type(exc).__name__}: {str(exc)[:1200]}"
+                failed = True
+            rows.append(row)
+            if failed:
+                return {"ok": False, "results": rows, "completed_actions": index,
+                        "skipped_actions": len(actions)-index-1, "ends_exploration": False}
+        return {"ok": True, "results": rows, "completed_actions": len(actions),
+                "skipped_actions": 0, "ends_exploration": actions[-1]["action"] == "submit"}
 
     def _action(self, action):
         if self.remaining() <= 0:
             raise TimeoutError("Exploration window ended.")
         name = action["action"]
+        if name == "batch":
+            return self._batch(action)
         if name == "observe":
             result = self.console.observe(action["times"])
         elif name == "launch":
@@ -174,15 +230,29 @@ class DiscoveryAgent:
                     page[key] = [record[key][i] for i in indices]
             return {"index": index, "full_time_count": total, "sample_indices": indices, "record": page}
         elif name in ("check", "fit"):
-            result = candidate_tool(action["law"], self.mission, self.records,
+            source = self._candidate_source(action)
+            claims = self._candidate_claims(action, source) if name == "fit" else None
+            result = candidate_tool(source, self.mission, self.records,
                 fit=name == "fit", max_nfev=action.get("max_nfev", 12),
                 timeout=max(.001, min(self.tool_timeout, self.remaining())))
             if self.remaining() <= 0:
                 raise TimeoutError("Exploration ended while running the candidate tool.")
+            if name == "fit" and isinstance(result, dict):
+                result = dict(result)
+                result["saved_candidate"] = False
+                if result.get("ok") is True and claims is not None:
+                    result["draft"] = self._pair(result["law"], claims)
+                    result["saved_candidate"] = True
+                elif result.get("ok") is True:
+                    result["save_note"] = "No matching saved candidate or explicit claims; fitted law was returned without replacing the saved pair."
         elif name in ("draft", "submit"):
-            result = self._pair(action["law"], action["claims"], submit=name == "submit")
+            source = self._candidate_source(action)
+            claims = self._candidate_claims(action, source)
+            if claims is None:
+                raise ValueError("This law needs explicit claims before draft or submit.")
+            result = self._pair(source, claims, submit=name == "submit")
         else:
-            raise ValueError("Unknown action; use observe/launch/archive/view_record/check/fit/draft/submit.")
+            raise ValueError("Unknown action; use observe/launch/archive/view_record/check/fit/draft/submit/batch.")
         if isinstance(result, dict) and isinstance(result.get("budget"), dict):
             self.last_budget = result["budget"]
         return result
@@ -193,11 +263,12 @@ class DiscoveryAgent:
                  "turn": turn, "max_turns": self.max_turns,
                  "remaining_model_calls_including_current":
                      self.max_turns-turn+1 if self.max_turns else None,
-                 "instruction": "Use view_record index/start/count pages to inspect full data; submit a valid candidate before time expires."}
+                 "batch_max_actions": MAX_BATCH_ACTIONS,
+                 "instruction": "MISSION already includes first_light (record 0); its current 8 time points are complete. Use view_record only when you need an omitted page. Choose experiments and candidates yourself; submit a valid pair before time expires."}
         if self.max_turns:
             state["instruction"] += " Plan experiments and candidate generation within the remaining model calls."
             if turn == self.max_turns:
-                state["instruction"] += " This is the final model call. Return submit with complete law.py and claims now; reuse the best saved candidate if needed."
+                state["instruction"] += " This is the final model call. Return submit, or a batch ending with submit. You may use law_ref: saved to submit the latest valid pair without repeating its source; a successful fit with bound claims also saves that fitted pair. No experiment is mandatory."
         essential = [{"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "MISSION:\n"+_json(compact(self.mission))},
             {"role": "user", "content": "CURRENT_STATE:\n"+_json(state)}]
@@ -231,8 +302,14 @@ class DiscoveryAgent:
                     break
                 row = {"turn": turn, "remaining_before": self.remaining()}
                 try:
-                    response = self.model.complete(self._messages(turn), max_tokens=self.max_tokens,
-                        timeout=max(.001, min(self.request_timeout, self.remaining())))
+                    try:
+                        response = self.model.complete(self._messages(turn), max_tokens=self.max_tokens,
+                            timeout=max(.001, min(self.request_timeout, self.remaining())))
+                    finally:
+                        diagnostic = getattr(self.model, "last_call_diagnostic",
+                                             getattr(self.model, "last_generation_report", None))
+                        if isinstance(diagnostic, dict):
+                            row["generation"] = dict(diagnostic)
                     if self.remaining() <= 0:
                         row["late_response_rejected"] = True
                         self.events.append(row)
@@ -243,7 +320,8 @@ class DiscoveryAgent:
                     row["result"] = result
                     self.history.extend([{"role": "assistant", "content": response},
                         {"role": "user", "content": "TOOL_RESULT:\n"+_json(compact(result))}])
-                    if action["action"] == "submit":
+                    if (action["action"] == "submit" or
+                            action["action"] == "batch" and result.get("ends_exploration") is True):
                         status = "submitted"
                 except InferenceError as exc:
                     row["inference_error"] = str(exc)[:1000]
@@ -265,7 +343,8 @@ class DiscoveryAgent:
             if status != "submitted" and self.remaining() > 0 and self.latest:
                 self._pair(self.latest["law"], self.latest["claims"], submit=True)
                 status = "submitted_after_optional_turn_limit"
-            elif self.max_turns and turn >= self.max_turns and self.remaining() > 0:
+            elif (status != "submitted" and self.max_turns and turn >= self.max_turns
+                  and self.remaining() > 0):
                 status = "optional_turn_limit_no_submission"
         finally:
             self._save_json("events.json", self.events)

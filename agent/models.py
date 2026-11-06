@@ -28,6 +28,39 @@ DEFAULT_MODEL_PYTHON = '/opt/shore-h200-cu128/.venv-vllm-cu128/bin/python'
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
+def action_output_schema():
+    """Constrain transport syntax only; no scientific answers or defaults.
+
+    Console and candidate validators still check action semantics. This schema
+    deliberately does not require a new law/claims when a saved pair is reused.
+    """
+    names = ['observe', 'launch', 'archive', 'view_record', 'check', 'fit', 'draft', 'submit']
+    properties = {
+        'action': {'type': 'string', 'enum': names},
+        'law': {'type': 'string'},
+        'law_ref': {'type': 'string', 'enum': ['saved']},
+        'claims': {'type': 'object', 'properties': {
+            'dynamics_order': {'type': 'integer', 'enum': [1, 2]},
+            'hidden_matter': {'type': 'boolean'},
+            'time_dependence': {'type': 'boolean'}},
+            'required': ['dynamics_order', 'hidden_matter', 'time_dependence'],
+            'additionalProperties': False},
+        'times': {'type': 'array', 'items': {'type': 'number'}},
+        't_launch': {'type': 'number'},
+        'readout': {'type': 'array', 'items': {'type': 'number'}},
+        'source_properties': {'type': 'object', 'additionalProperties': {'type': 'number'}},
+        'probes': {'type': 'array', 'items': {'type': 'object'}},
+        'index': {'type': 'integer'}, 'start': {'type': 'integer'},
+        'count': {'type': 'integer'}, 'max_nfev': {'type': 'integer'},
+    }
+    single = {'type': 'object', 'properties': properties,
+              'required': ['action'], 'additionalProperties': False}
+    return {'type': 'object', 'properties': {
+        **properties, 'action': {'type': 'string', 'enum': names + ['batch']},
+        'actions': {'type': 'array', 'minItems': 1, 'maxItems': 8, 'items': single}},
+        'required': ['action'], 'additionalProperties': False}
+
+
 class InferenceError(RuntimeError):
     """Configuration, inference transport, response or startup failure."""
 
@@ -57,7 +90,7 @@ class _NoRedirect(HTTPRedirectHandler):
 class ModelClient:
     """Use the specified local server only; served identity is self-reported."""
     capability_label = 'self_hosted_local_model_transport_unverified_weight_provenance'
-    def __init__(self, base_url, model=None, timeout=300.):
+    def __init__(self, base_url, model=None, timeout=300., *, structured_output=None):
         self.base_url = _base_url(base_url)
         if model is not None:
             try: model_spec(model)
@@ -67,7 +100,14 @@ class ModelClient:
         self._requested_model = model
         self.model = None
         self.timeout = _positive(timeout, 'timeout')
+        mode = os.environ.get('SHORE_STRUCTURED_OUTPUT', 'off') if structured_output is None else structured_output
+        if mode not in ('off', 'json_schema'):
+            raise InferenceError('SHORE_STRUCTURED_OUTPUT must be off or json_schema.')
+        self.structured_output = mode
         self.last_response = None
+        self.last_request_report = None
+        self.last_generation_report = None
+        self.generation_reports = []
         self._opener = build_opener(ProxyHandler({}), _NoRedirect())
 
     def _request(self, suffix, body=None, timeout=None):
@@ -77,6 +117,7 @@ class ModelClient:
             headers={'Content-Type':'application/json', 'Accept':'application/json'},
             method='GET' if data is None else 'POST')
         started = time.monotonic()
+        self.last_request_report = {'allowed_seconds': seconds}
         try:
             with self._opener.open(request, timeout=seconds) as response:
                 raw = response.read(MAX_RESPONSE_BYTES+1)
@@ -84,9 +125,11 @@ class ModelClient:
             raise InferenceError(f'Local inference returned HTTP {exc.code}. No fallback was attempted.') from None
         except (URLError, TimeoutError, OSError):
             raise InferenceError('Local inference connection failed or timed out. No fallback was attempted.') from None
+        finally:
+            self.last_request_report['elapsed_seconds'] = time.monotonic()-started
         # urllib socket timeouts bound an idle operation, not the whole request.
         # A surrounding episode watchdog stops the agent; never accept a late action.
-        if time.monotonic()-started >= seconds:
+        if self.last_request_report['elapsed_seconds'] >= seconds:
             raise InferenceError('Local inference response arrived after the allowed request window.')
         if len(raw) > MAX_RESPONSE_BYTES:
             raise InferenceError('Local inference response exceeds the byte limit.')
@@ -132,19 +175,48 @@ class ModelClient:
             raise InferenceError('max_tokens must be a positive integer.')
         if not isinstance(messages, list) or not messages:
             raise InferenceError('messages must be a nonempty chat message list.')
-        result = self._request('/chat/completions', {'model':self.model, 'messages':messages,
-            'max_tokens':max_tokens, 'temperature':.2, 'stream':False}, timeout=timeout)
-        self.last_response = result
+        body = {'model':self.model, 'messages':messages,
+            'max_tokens':max_tokens, 'temperature':.2, 'stream':False}
+        if self.structured_output == 'json_schema':
+            # vLLM's native field, opt-in for services supporting it. An HTTP
+            # rejection is surfaced, never retried as an uncounted model call.
+            body['structured_outputs'] = {'json': action_output_schema()}
+        report = {'status': 'started', 'max_tokens': max_tokens,
+                  'structured_output': self.structured_output, 'elapsed_seconds': None}
+        self.last_response = self.last_request_report = None
+        self.last_generation_report = report
+        self.generation_reports.append(report)
         try:
-            message = result['choices'][0]['message']
-            content = message.get('content')
-        except (KeyError, IndexError, TypeError, AttributeError):
-            raise InferenceError('Local inference response has no chat message.') from None
-        if content is None and isinstance(message.get('reasoning_content', message.get('reasoning')), str):
-            return ''  # Thinking-only generation has no final action to execute.
-        if not isinstance(content, str):
-            raise InferenceError('Local inference final content must be text.')
-        return re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            result = self._request('/chat/completions', body, timeout=timeout)
+            self.last_response = result
+            try:
+                choice = result['choices'][0]
+                message = choice['message']
+                content = message.get('content')
+            except (KeyError, IndexError, TypeError, AttributeError):
+                raise InferenceError('Local inference response has no chat message.') from None
+            reason = choice.get('finish_reason')
+            report['finish_reason'] = reason[:64] if isinstance(reason, str) else None
+            usage = result.get('usage')
+            report['usage'] = {key: usage[key] for key in
+                ('prompt_tokens', 'completion_tokens', 'total_tokens')
+                if isinstance(usage, dict) and type(usage.get(key)) is int and usage[key] >= 0}
+            report['output_characters'] = len(content) if isinstance(content, str) else 0
+            if content is None and isinstance(message.get('reasoning_content', message.get('reasoning')), str):
+                report['status'] = 'thinking_only'
+                return ''  # Thinking-only generation has no final action to execute.
+            if not isinstance(content, str):
+                raise InferenceError('Local inference final content must be text.')
+            report['status'] = 'received'
+            return re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+        except Exception as exc:
+            report['status'] = 'error'
+            report['error_type'] = type(exc).__name__
+            raise
+        finally:
+            if self.last_request_report is not None:
+                report['elapsed_seconds'] = self.last_request_report.get('elapsed_seconds')
+                report['allowed_seconds'] = self.last_request_report.get('allowed_seconds')
 
 
 def resolve_model_path(key, *, model_root=None, model_path=None):
