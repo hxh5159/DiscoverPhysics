@@ -242,7 +242,7 @@ class SubmissionTests(unittest.TestCase):
             result = packager.build_starter(output, root=root)
             with ZipFile(output) as archive:
                 names = set(archive.namelist())
-                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "FILE_LIST.txt", "starter-manifest.json"})
+                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"FILE_LIST.txt", "starter-manifest.json"})
                 self.assertTrue(all(name in archive.read("FILE_LIST.txt").decode("utf-8") for name in names))
                 self.assertEqual(archive.read("README.md"), (root / "docs/PARTICIPANT_README.md").read_bytes())
                 self.assertFalse(any(b"SECRET_MARKER_MUST_NOT_BE_PACKAGED" in archive.read(n) for n in names))
@@ -275,7 +275,7 @@ class SubmissionTests(unittest.TestCase):
             unpacked = folder / "unpacked"
             with ZipFile(archive_path) as archive:
                 names = set(archive.namelist())
-                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"START_HERE.txt", "FILE_LIST.txt", "starter-manifest.json"})
+                self.assertEqual(names, set(packager.PUBLIC_FILES) | {"FILE_LIST.txt", "starter-manifest.json"})
                 self.assertEqual(archive.read("README.md"), (ROOT / "docs/PARTICIPANT_README.md").read_bytes())
                 self.assertFalse(any(".project-memory" in name or "ScienceAgent" in name or "AGENTS" in name for name in names))
                 for name in names:

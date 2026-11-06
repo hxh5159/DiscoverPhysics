@@ -21,7 +21,7 @@ PUBLIC_FILES = (
     "development_worlds/__init__.py", "development_worlds/worlds.py",
     "development_worlds/catalog.py", "development_worlds/console.py",
     "development_worlds/evaluation.py", "development_worlds/service.py",
-    "development_worlds/runner.py", "development_worlds/README.md",
+    "development_worlds/runner.py",
     "scripts/__init__.py", "scripts/validate_claims.py", "scripts/validate_law.py", "scripts/validate_submission.py",
     "scripts/serve_model.py", "scripts/build_runtime_images.py", "scripts/make_submission.py",
     "scripts/evaluate_submission.py", "scripts/run_strategy.py", "scripts/prepare_strategy.py",
@@ -30,10 +30,7 @@ PUBLIC_FILES = (
     "scripts/pip_index_install.py", "scripts/prepare_vllm_dependencies.py", "scripts/preflight_cuda128_build.py",
     "scripts/prepare_torch_wheel.py",
     "scripts/verify_h200_cuda128.py", "requirements.txt",
-    "docs/LAW_API.txt", "docs/CONSOLE_API.txt", "docs/SUBMISSION_API.txt", "docs/CONTEST_WORKFLOW.txt",
-    "docs/QUICKSTART.txt", "docs/PARTICIPANT_FILES.txt", "docs/STRATEGY_SUBMISSION.txt", "docs/MODEL_RUNTIME.txt", "docs/MODELS.txt",
-    "docs/CODE_AND_SUBMISSION_SPEC.txt", "docs/彼岸物理规律发现挑战赛_赛题说明_更新版.pdf",
-    "docs/H200_OFFLINE_SETUP.txt", "docs/CUDA128_SETUP.txt",
+    "docs/彼岸物理规律发现挑战赛_赛题说明_更新版.pdf",
     "docs/contracts/claims.schema.json", "docs/contracts/claims.example.json",
     "docs/contracts/law_api.json", "docs/contracts/law_case.schema.json",
     "docs/contracts/numerics.json", "docs/contracts/submission.schema.json", "docs/contracts/runtime.json",
@@ -53,28 +50,6 @@ PUBLIC_NUMERICS_FIELDS = (
     "freeze_policy", "time_meaning", "background_propagation", "shared_module",
     "prediction_program_protocol", "state_callback",
 )
-START_HERE = '''攻坚组开发与实验起步包
-
-先阅读根目录README.md，再看docs/QUICKSTART.txt、PARTICIPANT_FILES.txt和MODEL_RUNTIME.txt。
-本包包含六公开宇宙、可修改LLM基础框架、固定候选积分器及公开计分程序。
-在已安装NumPy与SciPy的官方环境中，可运行：
-  python scripts/validate_submission.py examples/submission.json
-  python scripts/validate_law.py examples/law.py --claims docs/contracts/claims.example.json
-  python scripts/validate_law.py examples/law.py --case examples/law_case.json --execute
-
-模型准备后，从本包根目录运行python -m development_worlds.runner --help。
-完整可修改策略在agent/，统一入口为agent/run.py；models.json逐项声明本次全部模型权重路径。
-每个开发与测评宇宙的探索固定3轮，不得修改或绕过；最后一轮优先提交law.py与claims.json。
-公开开发驱动和正式驱动使用相同Console及law.py/claims.json提交接口。
-每队提交agent目录与models.json两类绝对路径。多个子智能体由agent/run.py统一协调。
-每组最多6次正式测评，六开发宇宙本地自测不占次数；测评期间停止编辑代码、配置及所用权重。
-模型从本队配置的实际目录加载，正式控制台地址及会话令牌由指挥部运行器提供。
-九个正式测评宇宙的环境和验证数据由指挥部保管，不放入本开发包。
-正式模拟、固定积分评分和隐藏运行材料由指挥部管理。详见docs/STRATEGY_SUBMISSION.txt。
-本包不含正式九宇宙的真实模拟器、定律参数或隐藏验证真值，也不附带权重和凭证。
-六公开运行的观测及日志可保留；九隐藏运行材料由指挥部保留，赛中只返回规定成绩和必要错误。
-'''
-
 PUBLIC_EXPLORATION_FIELDS = (
     "protocol_version", "updated", "scoring_contract", "feedback_contract",
     "evaluation_feedback", "mission", "time_model", "first_light", "launch_request",
@@ -127,7 +102,6 @@ def build_starter(output, *, root=ROOT, overwrite=False):
             if current.is_symlink():
                 raise ValueError(f"Public source path must not contain symlinks: {relative}")
         payloads[relative] = _public_bytes(relative, lexical.read_bytes())
-    payloads["START_HERE.txt"] = START_HERE.encode("utf-8")
     listed = sorted(set(payloads) | {"FILE_LIST.txt", "starter-manifest.json"})
     payloads["FILE_LIST.txt"] = ("攻坚组开发包文件清单（不含九宇宙真实模拟器/真值）\n"
         + "文件总数：" + str(len(listed)) + "\n\n" + "\n".join(listed) + "\n").encode("utf-8")
