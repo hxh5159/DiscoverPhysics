@@ -27,7 +27,7 @@ python scripts/serve_model.py --model 27b --model-root <本地根目录> --dry-r
 python scripts/serve_model.py --model 27b --model-root <本地根目录> --model-python <模型Python>
   在实际GPU节点启动本地vLLM服务。未提供--base-url时，基础agent也可自动执行此过程。
 
-固定单宇宙600秒从mission之后开始；服务加载有独立startup-timeout。
+固定单宇宙300秒从mission之后开始；服务加载有独立startup-timeout。
 客户端只接显式本机服务，不使用环境代理或外部模型回退。服务名称本身不能证明权重来源。
 实际执行会检查所选设备的容量。白名单仅保留27B、35B-A3B、122B-A10B三个Qwen家族及
 规定的精度配置，397B和原非Qwen模型已移除；具体名称及选择原因见MODELS.txt。

@@ -1,7 +1,7 @@
 {
-  "scoring_version": "draft-3.11.0",
-  "updated": "2026-11-05",
-  "implementation_status": "按用户确认统一恢复10e预言映射；MSE/globalV、80/15/5、P>=40节约资格、加权节约分升序同分规则及仅总分反馈保持；不新增模型或物理实验",
+  "scoring_version": "draft-3.13.0",
+  "updated": "2026-11-06",
+  "implementation_status": "按用户指定改用六界显式权重：Adam/Lilith各0.15，Leliel/Matriel各0.20，Sachiel/Arael各0.15；原九界难度标签保留，不用于重算本次权重。10点配额、300秒、10e预言映射、80/15/5、P>=40节约资格及同分规则保持。",
   "total_max_score": 100,
   "prediction": {
     "max_score": 80,
@@ -109,15 +109,15 @@
     "enabled": true,
     "counted_in_total": true,
     "max_score": 5,
-    "basis": "仅计本宇宙100点实验能量的剩余比例；现实墙钟与模拟物理时间均不参与节约分，免费observe的剩余次数也不折算本项",
-    "energy_budget": 100,
+    "basis": "仅计本宇宙10点实验能量的剩余比例；现实墙钟与模拟物理时间均不参与节约分，免费observe的剩余次数也不折算本项",
+    "energy_budget": 10,
     "energy_used_definition": "本宇宙已计费的有效实验能量，以控制台账本为准；当前每枚主动新探针1点，第一束光和免费观测不扣能量",
     "eligibility": "prediction>=40",
     "eligibility_comparison": "按未作显示舍入的本次预言分比较，40分包含在内；与定律分无关，不再要求law==15或prediction+law>20",
-    "mapping": "prediction>=40时5*(1-energy_used/100)，否则0",
+    "mapping": "prediction>=40时5*(1-energy_used/10)，否则0",
     "energy_used_domain": [
       0,
-      100
+      10
     ],
     "time_used": false,
     "observe_call_remainder_used": false,
@@ -125,19 +125,19 @@
       {
         "prediction": 39.99,
         "law": 15,
-        "energy_used": 40,
+        "energy_used": 4,
         "saving_score": 0
       },
       {
         "prediction": 40,
         "law": 0,
-        "energy_used": 40,
+        "energy_used": 4,
         "saving_score": 3
       },
       {
         "prediction": 80,
         "law": 15,
-        "energy_used": 100,
+        "energy_used": 10,
         "saving_score": 0
       }
     ]
@@ -145,13 +145,13 @@
   "total_mapping": "prediction+law+saving",
   "feedback": {
     "schema_file": "feedback.schema.json",
-    "schema_version": "1.0.0",
+    "schema_version": "1.1.0",
     "participant_visible_fields": [
       "total_score",
       "world_scores"
     ],
-    "total_score": "九宇宙总分按既定档位权重汇总的加权均分，范围0到100",
-    "world_scores": "以九个公开宇宙名称为键的对象，每个值只给该宇宙prediction+law+saving的合计，范围0到100",
+    "total_score": "本次六个所选宇宙总分按evaluation_selection.evaluation_weights加权汇总，范围0到100；完整九界历史结果使用其原profile权重，不与本次混排。",
+    "world_scores": "现行结果以本次六个宇宙名称为键，每值仅为prediction+law+saving的合计；九界格式仅兼容完整历史结果，不填充未评宇宙的零分。",
     "participant_hidden": [
       "预言、定律和节约分项及其单独状态",
       "三个声明逐项匹配结果、正确答案或科学正确性提示",
@@ -176,19 +176,14 @@
     "parameter_limit": 5,
     "numerics_version": "1.1",
     "exploration_budget_reference": "exploration_protocol.json",
-    "ranking": "加权总分较高者优先；总分完全相同时比较同一次完整提交的加权节约分，较低者靠前；仍相同并列，不重跑模型或实验"
+    "ranking": "加权总分较高者优先；总分完全相同时比较同一次完整提交的加权节约分，较低者靠前；仍相同并列，不重跑模型或实验",
+    "tier_weights_scope": "仅原九宇宙完整评测的历史档位权重；当前六界总分和同分比较只使用evaluation_selection.evaluation_weights。"
   },
   "ready_for_ranking": false,
   "ranking": {
     "primary": "未作显示舍入的加权总分降序",
-    "only_tiebreak": "同一次完整提交的所选三宇宙加权节约分升序",
-    "method": "C_weighted=0.3*C_Tabris+0.4*C_Ramiel+0.3*C_Leliel",
-    "tier_weights": [
-      0.3,
-      0.4,
-      0.3
-    ],
-    "worlds_per_tier": 1,
+    "only_tiebreak": "同一次完整提交的所选六宇宙加权节约分升序",
+    "method": "C_weighted=0.15*C_Adam+0.15*C_Lilith+0.15*C_Sachiel+0.20*C_Matriel+0.20*C_Leliel+0.15*C_Arael",
     "input": "本次已计算并私有保存的每个宇宙节约分C，不从宇宙总分推测，不新采样或运行模型",
     "compute_when": "本次完整计分时保存私有C及加权C；主总分相同才用于排序",
     "remaining_tie": "并列；受理时间或job_id仅保证显示顺序，不改变并列名次",
@@ -196,14 +191,23 @@
     "bootstrap_used": false,
     "parameter_cap_unchanged": 5,
     "visibility": "仅内部排序使用，公开反馈仍只总分和各宇宙总分，不返回C分项或加权C",
-    "legacy_results": "旧完成记录缺C时禁止按新规则排名；只能从同次匹配身份且总分完全相符的私有结果回填，不默认为0、不从能量或总分猜测",
-    "same_team_best": "同队按总分降序、加权C升序选择一次完整提交，不能拼接不同提交的分项"
+    "legacy_results": "旧三界、九界或权重映射不同的结果不得混入当前六界榜单；同一profile旧完成记录缺C时，只能从同次匹配身份且总分完全相符的私有结果回填，不默认为0。",
+    "same_team_best": "同队按总分降序、加权C升序选择一次完整提交，不能拼接不同提交的分项",
+    "evaluation_weights": {
+      "Adam": 0.15,
+      "Lilith": 0.15,
+      "Sachiel": 0.15,
+      "Matriel": 0.2,
+      "Leliel": 0.2,
+      "Arael": 0.15
+    },
+    "weight_policy": "与本次总分使用完全相同的显式宇宙权重；不按原难度档重新分配或归一化。"
   },
   "submission_evaluation": {
     "each_submission_is_independent": true,
     "complete_scoring_per_submission": true,
     "previous_submission_used_as_scoring_input": false,
-    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价本次选定的三个宇宙；不读取历史提交来补全本次结果或调整本次分数",
+    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价本次选定的六个宇宙；不读取历史提交来补全本次结果或调整本次分数",
     "new_submission_may_differ": "参赛队可反复改进并提交；不同次运行或随机探索不要求产生相同结果，不把独立新提交当作对旧提交的复算",
     "best_result_scope": "在线榜单和最终结算均选取同一攻坚组有效完整提交中加权总分最高的一次；其各宇宙分数须来自该同一次完整提交",
     "per_world_historical_best_stitching_allowed": false,
@@ -238,14 +242,52 @@
       "Lilin"
     ],
     "evaluation_worlds": [
-      "Tabris",
-      "Ramiel",
-      "Leliel"
+      "Adam",
+      "Lilith",
+      "Sachiel",
+      "Matriel",
+      "Leliel",
+      "Arael"
     ],
-    "worlds_per_tier_evaluated": 1,
-    "selection_basis": "按本次单张H200上的Qwen3.5-122B-A10B-FP8九宇宙单次实测，选择各档未舍入总分最高的宇宙；这是本次模型与流程下的选择依据，不代表所有模型的普遍难度排序。",
-    "weighted_total": "S=0.3*S_Tabris+0.4*S_Ramiel+0.3*S_Leliel",
+    "selection_basis": "用户直接指定六个宇宙及权重，不再按历史得分取每档一个；以下分组是计分分组，不是修改原九界的难度标签。",
+    "weighted_total": "S=0.15*S_Adam+0.15*S_Lilith+0.15*S_Sachiel+0.20*S_Matriel+0.20*S_Leliel+0.15*S_Arael",
     "unselected_worlds": "保留全部定义、真实模拟器、参数与验证数据，本次不运行、不计零、不作为缺交卷。",
-    "historical_scores": "三宇宙与九宇宙运行使用独立榜单，不混排或拼接历史成绩。"
+    "historical_scores": "不同宇宙集合或不同显式权重的运行使用独立榜单；当前六界与旧三界、完整九界结果不混排、不拼接。",
+    "profile": "strategy-v5",
+    "evaluation_weights": {
+      "Adam": 0.15,
+      "Lilith": 0.15,
+      "Sachiel": 0.15,
+      "Matriel": 0.2,
+      "Leliel": 0.2,
+      "Arael": 0.15
+    },
+    "scoring_groups": [
+      {
+        "worlds": [
+          "Adam",
+          "Lilith"
+        ],
+        "group_weight": 0.3,
+        "weight_per_world": 0.15
+      },
+      {
+        "worlds": [
+          "Leliel",
+          "Matriel"
+        ],
+        "group_weight": 0.4,
+        "weight_per_world": 0.2
+      },
+      {
+        "worlds": [
+          "Sachiel",
+          "Arael"
+        ],
+        "group_weight": 0.3,
+        "weight_per_world": 0.15
+      }
+    ],
+    "original_difficulty_labels_unchanged": true
   }
 }

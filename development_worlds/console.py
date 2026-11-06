@@ -13,6 +13,7 @@ from typing import Callable
 
 import numpy as np
 
+from .catalog import ENERGY_BUDGET, WALL_CLOCK_SECONDS
 from .worlds import (
     DevelopmentSimulator, SINGLE_CENTER, DT, NUMERICS_VERSION,
     _finite_scalar, _tick, _sample_ticks, _state_array,
@@ -76,14 +77,14 @@ class DevelopmentConsole:
 
     def _configure(self):
         c = self._config
-        self._energy_budget = self._positive_limit(c, "energy_budget", 100)
+        self._energy_budget = self._positive_limit(c, "energy_budget", ENERGY_BUDGET)
         self._observe_limit = self._positive_limit(c, "observe_calls", 20)
         self._max_probes = self._positive_limit(c, "max_probes_per_launch", 8)
         self._max_readouts = self._positive_limit(c, "max_readouts_per_probe", 50)
         self._max_observe_times = self._positive_limit(c, "max_times_per_observe", 50)
         if self._max_probes > 8 or self._max_readouts > 50 or self._max_observe_times > 50:
             raise ValueError("Calibration limits cannot exceed the current core batch/sample caps.")
-        self._wall_seconds = _finite_scalar(c.get("wall_clock_seconds", 600), "wall_clock_seconds")
+        self._wall_seconds = _finite_scalar(c.get("wall_clock_seconds", WALL_CLOCK_SECONDS), "wall_clock_seconds")
         if self._wall_seconds <= 0:
             raise ValueError("wall_clock_seconds must be positive.")
         region = c.get("launch_region")

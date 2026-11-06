@@ -1,9 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:discoverphysics:feedback:1.0.0",
+  "$id": "urn:discoverphysics:feedback:1.1.0",
   "title": "参赛者成绩反馈格式契约",
-  "description": "只公开总分和本次所选宇宙合计分，不允许附带分项、逐声明正确性、误差、评分日志或内部真值。总分须由各宇宙分数按既定档位权重计算；该算术关系由反馈生成端核对，JSON Schema只校验形状与数值范围。",
-  "x-contract-version": "1.0.0",
+  "description": "只公开总分和本次所选宇宙合计分，不允许附带分项、逐声明正确性、误差、评分日志或内部真值。现行六界总分按profile显式宇宙权重计算，不能由原难度标签推算；该算术关系由反馈生成端核对，JSON Schema只校验形状与数值范围。完整九界形状仅兼容历史结果，旧三界由历史包自己的旧契约处理。",
+  "x-contract-version": "1.1.0",
   "x-number-policy": "使用标准JSON有限数值；生成端禁止NaN/Infinity，不通过显示舍入改变内部排名和节约资格判断。",
   "type": "object",
   "additionalProperties": false,
@@ -13,13 +13,13 @@
   ],
   "properties": {
     "total_score": {
-      "description": "按一级30%、二级40%、三级30%汇总；本次每档一个宇宙。",
+      "description": "现行六界按Adam/Lilith/Sachiel/Arael各0.15，Matriel/Leliel各0.20汇总；完整九界历史结果仍按对应历史profile，不能混排。",
       "type": "number",
       "minimum": 0,
       "maximum": 100
     },
     "world_scores": {
-      "description": "每宇宙只报告预言、定律与节约相加后的总分。现行配置只返回Tabris、Ramiel、Leliel；九宇宙分数字段形式仅兼容完整历史结果，不补零。",
+      "description": "每宇宙只报告预言、定律与节约相加后的总分。现行六界为Adam、Lilith、Sachiel、Matriel、Leliel、Arael；九界形状仅兼容完整历史结果，不给未评宇宙补零。",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -54,12 +54,15 @@
       "oneOf": [
         {
           "required": [
-            "Tabris",
-            "Ramiel",
-            "Leliel"
+            "Adam",
+            "Lilith",
+            "Sachiel",
+            "Matriel",
+            "Leliel",
+            "Arael"
           ],
-          "minProperties": 3,
-          "maxProperties": 3
+          "minProperties": 6,
+          "maxProperties": 6
         },
         {
           "required": [

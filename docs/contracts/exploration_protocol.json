@@ -1,8 +1,8 @@
 {
-  "protocol_version": "3.9.0",
-  "updated": "2026-11-02",
+  "protocol_version": "3.10.0",
+  "updated": "2026-11-06",
   "implementation_status": "公开Console、外层清单/起步包、私有会话服务、固定预测桥、九宇宙运行器、持久化队列与榜单已实现并做本地工程检查；目标Linux权限/GPU/模型/容量和正式profile仍待验收",
-  "revision_scope": "2026-11-02单宇宙自动探索与推理限时600秒，包含模型调用及工具处理；模型加载和探索结束后的固定积分/评分另计。观测噪声1.1.0、力场、物理时间网格、配额与计分公式保持",
+  "revision_scope": "2026-11-06单宇宙能量改为10点、自动探索与推理限时300秒；模型调用及工具处理计入探索，模型加载与探索结束后的固定积分/评分另计。观测噪声、力场、物理时间网格、三次模型调用和10e预言映射保持；节约分按实际10点配额的剩余比例计算。",
   "scoring_contract": "scoring.json",
   "feedback_contract": "feedback.schema.json",
   "evaluation_feedback": {
@@ -69,12 +69,12 @@
     "source_property_interventions": "按本世界公开目录解释source_properties；当前定义允许的源侧干预不改变背景位置/速度轨迹，因此observe(times)查询唯一背景，不由最近一次launch隐式切换配置。若后续改场使源侧属性影响背景，须同时修订接口，不能混用配置数据 背景几何相同不等于源属性值被忽略：本次launch或验证案例选定的source_properties仍须进入候选输入，并随探针数据记录。",
     "wall_clock_is_independent": true,
     "wall_clock_start": "本宇宙第一次成功mission调用创建会话时",
-    "wall_clock_seconds": 600,
-    "wall_clock_definition": "从本宇宙第一次成功mission建立会话起累计600秒现实经过时间，包含模型调用及工具处理；模型加载与探索结束后的指挥部固定积分/评分另计。不是日期钟点、模拟物理t或48小时实训开发窗口",
+    "wall_clock_seconds": 300,
+    "wall_clock_definition": "从本宇宙第一次成功mission建立会话起累计300秒现实经过时间，包含模型调用及工具处理；模型加载与探索结束后的指挥部固定积分/评分另计。不是日期钟点、模拟物理t或48小时实训开发窗口",
     "absolute_physical_time_definition": "t_launch等绝对物理时刻相对于本宇宙统一t=0；readout为相对投放偏移，与现实墙钟无换算关系",
     "time_used_for_saving_score": false,
     "guardrail_policy": {
-      "purpose": "单宇宙统一600秒自动探索与推理窗口，防止无限现实运行；物理时域与单轨迹跨度仍由各宇宙公开范围约束",
+      "purpose": "单宇宙统一300秒自动探索与推理窗口，防止无限现实运行；物理时域与单轨迹跨度仍由各宇宙公开范围约束",
       "limits_public_and_uniform": true,
       "time_requests_must_be_finite_and_within_public_bounds": true,
       "validate_before_simulation": true,
@@ -174,11 +174,11 @@
   "exploration_limits": {
     "current_working_scheme": "A",
     "alternative_B": "保留原有备选，未叠加固定LLM轮数限制",
-    "energy": 100,
+    "energy": 10,
     "energy_per_new_probe": 1,
     "observe_calls": 20,
     "max_times_per_observe": 50,
-    "wall_clock_seconds": 600,
+    "wall_clock_seconds": 300,
     "gauge_enabled": false
   },
   "fitting": {
@@ -285,7 +285,7 @@
     "each_submission_is_independent": true,
     "complete_scoring_per_submission": true,
     "previous_submission_used_as_scoring_input": false,
-    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价本次选定的三个宇宙；不读取历史提交来补全本次结果或调整本次分数",
+    "description": "每次有效正式提交均作为独立结果，按本次完整计分规则评价本次选定的六个宇宙；不读取历史提交来补全本次结果或调整本次分数",
     "new_submission_may_differ": "参赛队可反复改进并提交；不同次运行或随机探索不要求产生相同结果，不把独立新提交当作对旧提交的复算",
     "best_result_scope": "在线榜单和最终结算均选取同一攻坚组有效完整提交中加权总分最高的一次；其各宇宙分数须来自该同一次完整提交",
     "per_world_historical_best_stitching_allowed": false,

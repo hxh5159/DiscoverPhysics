@@ -93,7 +93,7 @@ def run_episode(world, directory, command, *, seed=0, startup_seconds=900.,
     result = {"world": str(world), "scope": "public_development", "end_reason": finalized["reason"],
               "agent_exit_code": exit_code, "budget": finalized["budget"],
               "has_valid_submission": finalized["has_valid_submission"],
-              "wall_clock_seconds": 600, "startup_and_exploration_elapsed_seconds": time.monotonic()-launched}
+              "wall_clock_seconds": catalog.WALL_CLOCK_SECONDS, "startup_and_exploration_elapsed_seconds": time.monotonic()-launched}
     if session.latest is not None:
         result["law_sha256"] = session.latest["law_sha256"]
         result["claims_sha256"] = session.latest["claims_sha256"]

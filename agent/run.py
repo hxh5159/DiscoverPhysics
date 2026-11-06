@@ -1,7 +1,7 @@
 """Editable LLM discovery loop shared by public and organizer-hosted episodes.
 
 Run with ``python -m agent.run --model 27b``. Model startup/readiness
-precedes mission(), so it is separate from the 600-second exploration window.
+precedes mission(), so it is separate from the 300-second exploration window.
 No simulator, validation reference, answer library or external agent framework
 is imported by this agent. Its model proposes experiments and actual law.py.
 """

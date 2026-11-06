@@ -1,5 +1,7 @@
 """Protocol and independent mathematical checks for public design prototypes."""
 import unittest
+import copy
+from unittest.mock import patch
 import numpy as np
 from development_worlds.worlds import DevelopmentSimulator
 from development_worlds import catalog
@@ -45,8 +47,54 @@ class DevelopmentTests(unittest.TestCase):
         self.assertEqual(prediction_score(0.,1.),80.)
         self.assertEqual(prediction_score(.1,1.),40.)
         truth=claims_truth('6')
-        self.assertEqual(score_components(40.,truth,truth,20)['saving'],4.)
-        self.assertEqual(score_components(39.99,truth,truth,20)['saving'],0.)
-        with self.assertRaises(ValueError):score_components(80.,{**truth,'hidden_matter':0},truth,20)
+        self.assertEqual(score_components(40.,truth,truth,2)['saving'],4.)
+        self.assertEqual(score_components(39.99,truth,truth,2)['saving'],0.)
+        self.assertEqual(score_components(80.,truth,truth,0)['total'],100.)
+        self.assertEqual(score_components(80.,truth,truth,10)['saving'],0.)
+        wrong = {'dynamics_order': 1, 'hidden_matter': True, 'time_dependence': False}
+        self.assertEqual(score_components(40.,wrong,truth,4)['saving'],3.)
+        for energy in (-1, 11, 100, float('inf'), float('nan')):
+            with self.subTest(energy=energy), self.assertRaises(ValueError):
+                score_components(80.,truth,truth,energy)
+        with self.assertRaises(ValueError):score_components(80.,{**truth,'hidden_matter':0},truth,2)
+
+    def test_ten_probe_budget_is_enforced_before_simulation_without_reset(self):
+        for world in catalog.WORLDS:
+            with self.subTest(world=world):
+                cfg = catalog.config(world)
+                con = DevelopmentConsole(world, catalog.noise_sigma(world), 7, cfg, clock=lambda: 0.)
+                mission = con.mission()
+                self.assertEqual(mission['limits']['energy_budget'], 10)
+                self.assertEqual(len(mission['first_light']['probes']), 2)
+                self.assertEqual(con.budget['energy_used'], 0)
+                request = copy.deepcopy(cfg['first_light'])
+                request['readout'] = [0., .005]
+                request['probes'] *= 4
+                con.launch(**request)  # Eight is still the per-call cap.
+                self.assertEqual(con.budget['energy_remaining'], 2)
+                request['probes'] = request['probes'][:3]
+                with patch.object(con._sim, 'launch') as simulate, self.assertRaisesRegex(RuntimeError, 'Insufficient energy'):
+                    con.launch(**request)
+                simulate.assert_not_called()
+                self.assertEqual(con.budget['energy_used'], 8)
+                request['probes'] = request['probes'][:2]
+                con.launch(**request)
+                self.assertEqual(con.budget['energy_remaining'], 0)
+                request['probes'] = request['probes'][:1]
+                with patch.object(con._sim, 'launch') as simulate, self.assertRaisesRegex(RuntimeError, 'Insufficient energy'):
+                    con.launch(**request)  # The eleventh probe is rejected.
+                simulate.assert_not_called()
+                self.assertEqual(con.mission()['budget']['energy_used'], 10)
+                con.observe([0.])  # Its independent free allowance is retained.
+                self.assertEqual(con.budget['observe_used'], 1)
+                self.assertEqual(con.budget['energy_used'], 10)
+
+    def test_console_omitted_limits_use_current_defaults(self):
+        cfg = catalog.config('2')
+        del cfg['energy_budget'], cfg['wall_clock_seconds']
+        con = DevelopmentConsole('2', 0., 0, cfg, clock=lambda: 0.)
+        limits = con.mission()['limits']
+        self.assertEqual(limits['energy_budget'], 10)
+        self.assertEqual(limits['wall_clock_seconds'], 300.)
 
 if __name__=='__main__':unittest.main()

@@ -92,10 +92,10 @@ def score_components(prediction, claims, truth, energy_used):
     if any(type(claims[key]) is not bool for key in ("hidden_matter", "time_dependence")):
         raise ValueError("Claims must use strict booleans.")
     energy = float(energy_used)
-    if not math.isfinite(energy) or not 0 <= energy <= 100:
-        raise ValueError("Energy must be in[0,100].")
+    if not math.isfinite(energy) or not 0 <= energy <= catalog.ENERGY_BUDGET:
+        raise ValueError(f"Energy must be in[0,{catalog.ENERGY_BUDGET}].")
     law = sum(5 for key, value in truth.items() if claims[key] == value)
-    saving = 5 * (1 - energy / 100) if prediction >= 40 else 0.
+    saving = 5 * (1 - energy / catalog.ENERGY_BUDGET) if prediction >= 40 else 0.
     return {"prediction": float(prediction), "law": law, "saving": saving,
             "total": float(prediction + law + saving)}
 

@@ -1,4 +1,4 @@
-"""The public development session uses the same ten-minute episode limit."""
+"""The public development session uses the same five-minute episode limit."""
 import unittest
 
 from development_worlds import catalog
@@ -11,14 +11,14 @@ class ExplorationLimitTests(unittest.TestCase):
             with self.subTest(world=world):
                 now = [100.]
                 cfg = catalog.config(world)
-                self.assertEqual(cfg['wall_clock_seconds'], 600.)
+                self.assertEqual(cfg['wall_clock_seconds'], 300.)
                 console = DevelopmentConsole(world, catalog.noise_sigma(world), 1,
                                              cfg, clock=lambda: now[0])
                 now[0] += 10000  # Loading/setup before mission is not charged.
                 first = console.mission()
-                self.assertEqual(first['limits']['wall_clock_seconds'], 600.)
-                self.assertEqual(console.budget['wall_clock_remaining_seconds'], 600.)
-                now[0] += 599
+                self.assertEqual(first['limits']['wall_clock_seconds'], 300.)
+                self.assertEqual(console.budget['wall_clock_remaining_seconds'], 300.)
+                now[0] += 299
                 self.assertEqual(console.mission()['budget']['wall_clock_remaining_seconds'], 1.)
                 now[0] += 1
                 with self.assertRaises(TimeoutError):

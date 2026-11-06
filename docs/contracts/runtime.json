@@ -1,19 +1,22 @@
 {
-  "runtime_version": "1.6.0",
-  "updated": "2026-11-05",
+  "runtime_version": "1.8.0",
+  "updated": "2026-11-06",
   "status": "organizer_owned_environment_with_strategy_and_model_paths",
   "outer_submission": {
     "manifest_schema": "strategy.schema.json + model_registry.schema.json",
     "identity": "提交agent目录与models.json两类路径；测评期间停止修改策略、配置及所用权重",
     "entrypoint": "固定启动器以agent包加载提交的agent/run.py；全部子智能体在该入口内协调",
     "world_order": [
-      "Tabris",
-      "Ramiel",
-      "Leliel"
+      "Adam",
+      "Lilith",
+      "Sachiel",
+      "Matriel",
+      "Leliel",
+      "Arael"
     ],
     "runs_per_world": 1,
     "team_training_gpus_used": "according_to_organizer_instance_allocation",
-    "evaluation_gpu_allocation": "同一实例内按指挥部安排使用GPU；复用队伍卡时释放相应显存，本次所选三个宇宙顺序运行",
+    "evaluation_gpu_allocation": "同一实例内按指挥部安排使用GPU；复用队伍卡时释放相应显存，本次所选六个宇宙顺序运行",
     "available_world_order": [
       "Adam",
       "Lilith",
@@ -26,17 +29,26 @@
       "Lilin"
     ],
     "strategy_assets": "全部自定义运行代码、提示词、推理配置和合法记忆位于agent目录；权重本体使用清单路径",
-    "model_binding": "所有模型使用唯一ID，完整checkpoint或底座加adapter_path逐项预检；相对路径基于models.json父目录。单个白名单模型可加载多个实例，多个智能体或实例可共用同一ID及同源权重路径，无须重复复制权重；不同微调结果分别登记。"
+    "model_binding": "所有模型使用唯一ID，完整checkpoint或底座加adapter_path逐项预检；相对路径基于models.json父目录。单个白名单模型可加载多个实例，多个智能体或实例可共用同一ID及同源权重路径，无须重复复制权重；不同微调结果分别登记。",
+    "evaluation_weights": {
+      "Adam": 0.15,
+      "Lilith": 0.15,
+      "Sachiel": 0.15,
+      "Matriel": 0.2,
+      "Leliel": 0.2,
+      "Arael": 0.15
+    },
+    "weight_policy": "本次strategy-v5使用显式宇宙权重；原难度标签仅作描述，不能据原tier重算本次总分或节约分。"
   },
   "session": {
     "console_protocol_version": "1.0.0",
-    "exploration_protocol_version": "3.9.0",
+    "exploration_protocol_version": "3.10.0",
     "authenticated": true,
     "client_selects_world_or_session": false,
-    "wall_clock_seconds": 600,
-    "clock_start": "本宇宙首次成功mission；此后模型调用及工具处理计入600秒，重复调用不重置配额或时钟；模型加载和结束探索后的固定积分/评分另计",
+    "wall_clock_seconds": 300,
+    "clock_start": "本宇宙首次成功mission；此后模型调用及工具处理计入300秒，重复调用不重置配额或时钟；模型加载和结束探索后的固定积分/评分另计",
     "external_watchdog": true,
-    "energy": 100,
+    "energy": 10,
     "observe_calls": 20,
     "fixed_llm_round_cap": false,
     "invalid_artifact_ends_session": false,
@@ -44,7 +56,7 @@
     "timeout": "封存最后一份及时有效的law.py/claims.json配对；没有有效配对则该宇宙0分",
     "early_agent_exit": "停止该局并保留最后有效配对；如为指挥部运行基础设施失败，标记故障等待修复重评，不发布伪零分",
     "baseline_max_model_turns": 3,
-    "baseline_turn_definition": "一次模型响应对应一次动作决策；开发与隐藏环境共用基础框架默认3次。该默认值不改变固定控制台100/20/600协议，不是把旧联调5次动作解释为原有硬限制。"
+    "baseline_turn_definition": "一次模型响应对应一次动作决策；开发与隐藏环境共用基础框架默认3次。该默认值不改变固定控制台10/20/300协议，不是把旧联调5次动作解释为原有硬限制。"
   },
   "communication": {
     "agent": "官方认证的本机HTTP JSON控制台；Unix socket保留兼容，同一认证协议，非外部API",
@@ -73,29 +85,29 @@
     "manual_intervention_during_evaluation": false
   },
   "queue_and_ranking": {
-    "scope": "指挥部私有运行与工程诊断分开；四窗口受理次数由指挥部管理，最终按最高完整三界成绩排名",
+    "scope": "指挥部私有运行与工程诊断分开；受理次数由指挥部管理，最终按最高一次完整六界成绩排名；六界、旧三界与九界成绩不混排。",
     "deadline_basis": "成功受理时间，截止前受理的版本可在截止后完成评测",
     "deadline_persisted": true,
     "infrastructure_failure": "保留原受理版本，修复后重评，不当作候选科学失败",
-    "best": "最高一次完整所选三宇宙提交；不拼接逐宇宙历史最高分",
+    "best": "最高一次完整所选六宇宙提交；不拼接逐宇宙历史最高分",
     "score_feedback": [
       "total_score",
       "world_scores"
     ],
     "tiebreak": "总分相同，比较同次完整提交的加权节约分，较低者优先；仍同并列，不重跑模型或实验",
-    "private_ranking_metadata": "同次所选三宇宙C与加权C只存私有数据库，不进入反馈；缺元数据的旧记录须从已保存的匹配私有结果迁移后再排名"
+    "private_ranking_metadata": "同次所选六宇宙C与加权C只存私有数据库，不进入反馈；缺元数据的旧记录须从已保存的匹配私有结果迁移后再排名"
   },
   "pending_release_checks": [
     "真实白名单权重在目标Linux/H200完成加载与生成",
-    "实际修改过的队伍项目、模型检查点和本次所选三宇宙运行耗时与吞吐"
+    "实际修改过的队伍项目、模型检查点和本次所选六宇宙运行耗时与吞吐"
   ],
   "resource_guardrails": {
     "startup_seconds": 900,
     "candidate_timeout_seconds": 120,
     "shutdown_seconds": 30,
-    "exploration_wall_clock_seconds": 600,
-    "profile": "direct-v1-r3",
-    "semantics": "启动、候选执行和关闭为运行护栏，不改变从首次mission起的600秒探索"
+    "exploration_wall_clock_seconds": 300,
+    "profile": "strategy-v5",
+    "semantics": "启动、候选执行和关闭为运行护栏，不改变从首次mission起的300秒探索"
   },
   "strategy_path_submission": {
     "agent_directory_name": "agent",

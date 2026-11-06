@@ -21,7 +21,7 @@
   "hidden_scoring_truth_noise": false,
   "fresh_observation_independence": "另行重做同一真实实验独立抽噪声；不同坐标、探针、天体与采样记录独立",
   "cache_policy": "第一束光生成一次缓存；重复mission/archive不重新模拟或抽噪声",
-  "budget_policy_unchanged": "100点探针能量、每枚1点、20次免费observe仍独立；数值路径能量未耗尽，但未使用额外observe返回值，不能据此认定背景配额或拆分已验收；后续讨论可调整",
+  "budget_policy_unchanged": "现行配额为10点探针能量、每枚1点、20次免费observe仍独立；本次仅同步配额说明，不改变位置/速度噪声或无噪声评分真值。",
   "retired_rule": {
     "position_sigma": "0.05*sqrt(validation_V)",
     "status": "仅保留对照实验，不再作为现行默认；避免验证外逃/空间分散联动放大探索噪声"
