@@ -7,7 +7,7 @@
     "identity": "提交agent目录与models.json两类路径；测评期间停止修改策略、配置及所用权重",
     "entrypoint": "固定启动器以agent包加载提交的agent/run.py；全部子智能体在该入口内协调",
     "world_order": [
-      "Adam",
+      "Tabris",
       "Ramiel",
       "Leliel"
     ],

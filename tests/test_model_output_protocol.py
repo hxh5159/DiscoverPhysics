@@ -57,7 +57,8 @@ class ModelOutputProtocolTests(unittest.TestCase):
         self.assertEqual(schema, action_output_schema())
         self.assertEqual(body['max_tokens'], 2048)
         self.assertEqual(schema['required'], ['action'])
-        self.assertEqual(schema['properties']['law_ref']['enum'], ['saved'])
+        self.assertEqual(schema['properties']['law_ref']['enum'], ['saved', 'last_fit', 'draft'])
+        self.assertEqual(schema['properties']['candidate_id'], {'type': 'string'})
         self.assertEqual(schema['properties']['actions']['maxItems'], 8)
         self.assertNotIn('batch', schema['properties']['actions']['items']['properties']['action']['enum'])
         self.assertNotIn('default', json.dumps(schema))
@@ -79,6 +80,17 @@ class ModelOutputProtocolTests(unittest.TestCase):
              'probes': [{'pos': [1, 2], 'vel': [0, 0], 'properties': {}}]},
             {'action': 'fit', 'law_ref': 'saved'},
             {'action': 'submit', 'law_ref': 'saved'}]})
+        # A law can be fitted first and receive the model's explicit claims at
+        # submission; format constraints must not force a premature answer.
+        validator.validate({'action': 'batch', 'actions': [
+            {'action': 'fit', 'law': 'model generated law', 'max_nfev': 12},
+            {'action': 'submit', 'law_ref': 'last_fit', 'claims': {
+                'dynamics_order': 1, 'hidden_matter': True, 'time_dependence': True}}]})
+        for reference in ('saved', 'last_fit', 'draft'):
+            validator.validate({'action': 'check', 'law_ref': reference})
+        validator.validate({'action': 'fit', 'candidate_id': 'C0001'})
+        validator.validate({'action': 'submit', 'candidate_id': 'C0002', 'claims': {
+            'dynamics_order': 2, 'hidden_matter': False, 'time_dependence': False}})
 
     def test_environment_opt_in_is_explicit_and_overridable(self):
         with patch.dict(os.environ, {'SHORE_STRUCTURED_OUTPUT': 'json_schema'}):

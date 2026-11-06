@@ -32,13 +32,15 @@ def action_output_schema():
     """Constrain transport syntax only; no scientific answers or defaults.
 
     Console and candidate validators still check action semantics. This schema
-    deliberately does not require a new law/claims when a saved pair is reused.
+    deliberately allows law-only tool candidates and references; the agent
+    checks candidate existence and declaration ownership before submission.
     """
     names = ['observe', 'launch', 'archive', 'view_record', 'check', 'fit', 'draft', 'submit']
     properties = {
         'action': {'type': 'string', 'enum': names},
         'law': {'type': 'string'},
-        'law_ref': {'type': 'string', 'enum': ['saved']},
+        'law_ref': {'type': 'string', 'enum': ['saved', 'last_fit', 'draft']},
+        'candidate_id': {'type': 'string'},
         'claims': {'type': 'object', 'properties': {
             'dynamics_order': {'type': 'integer', 'enum': [1, 2]},
             'hidden_matter': {'type': 'boolean'},

@@ -182,7 +182,7 @@
   "ranking": {
     "primary": "未作显示舍入的加权总分降序",
     "only_tiebreak": "同一次完整提交的所选三宇宙加权节约分升序",
-    "method": "C_weighted=0.3*C_Adam+0.4*C_Ramiel+0.3*C_Leliel",
+    "method": "C_weighted=0.3*C_Tabris+0.4*C_Ramiel+0.3*C_Leliel",
     "tier_weights": [
       0.3,
       0.4,
@@ -238,13 +238,13 @@
       "Lilin"
     ],
     "evaluation_worlds": [
-      "Adam",
+      "Tabris",
       "Ramiel",
       "Leliel"
     ],
     "worlds_per_tier_evaluated": 1,
-    "selection_basis": "按此前已完成的固定参数六公开到九隐藏模拟各档总分，选择档内第二名，不重新模拟挑选。",
-    "weighted_total": "S=0.3*S_Adam+0.4*S_Ramiel+0.3*S_Leliel",
+    "selection_basis": "按本次单张H200上的Qwen3.5-122B-A10B-FP8九宇宙单次实测，选择各档未舍入总分最高的宇宙；这是本次模型与流程下的选择依据，不代表所有模型的普遍难度排序。",
+    "weighted_total": "S=0.3*S_Tabris+0.4*S_Ramiel+0.3*S_Leliel",
     "unselected_worlds": "保留全部定义、真实模拟器、参数与验证数据，本次不运行、不计零、不作为缺交卷。",
     "historical_scores": "三宇宙与九宇宙运行使用独立榜单，不混排或拼接历史成绩。"
   }

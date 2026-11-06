@@ -19,7 +19,7 @@
       "maximum": 100
     },
     "world_scores": {
-      "description": "每宇宙只报告预言、定律与节约相加后的总分。现行配置只返回Adam、Ramiel、Leliel；九宇宙分数字段形式仅兼容完整历史结果，不补零。",
+      "description": "每宇宙只报告预言、定律与节约相加后的总分。现行配置只返回Tabris、Ramiel、Leliel；九宇宙分数字段形式仅兼容完整历史结果，不补零。",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -54,7 +54,7 @@
       "oneOf": [
         {
           "required": [
-            "Adam",
+            "Tabris",
             "Ramiel",
             "Leliel"
           ],

@@ -91,10 +91,13 @@ class AgentActionFlowTests(unittest.TestCase):
                 calls = console.save_draft.call_count
                 with patch('agent.run.candidate_tool', return_value={'ok': True, 'law': FITTED}):
                     result = agent._action({'action': 'fit', 'law': OTHER})
-                self.assertFalse(result['saved_candidate'])
+                self.assertTrue(result['saved_candidate'])
+                self.assertFalse(result['saved_pair'])
                 self.assertEqual(result['law'], FITTED)
                 self.assertEqual(agent.latest, previous)
                 self.assertEqual(console.save_draft.call_count, calls)
+                self.assertEqual(agent.candidates[result['candidate_id']]['law'], FITTED)
+                self.assertIsNone(agent.candidates[result['candidate_id']]['claims'])
 
     def test_failed_fit_and_invalid_explicit_claims_keep_accepted_pair(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -206,6 +209,140 @@ class AgentActionFlowTests(unittest.TestCase):
             events = json.loads((root/'agent/events.json').read_text())
             self.assertEqual(events[0]['generation']['status'], 'transport_error')
             self.assertIn('inference_error', events[0])
+
+    def test_ramiel_sequence_checks_then_fits_and_submits_with_late_claims(self):
+        """Regress the failed real sequence without any hidden world or LLM."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = self.session(root)
+            model = Model([
+                {'action': 'view_record', 'index': 0, 'start': 0, 'count': 10},
+                {'action': 'batch', 'actions': [
+                    {'action': 'launch', **catalog.first_light('2')},
+                    {'action': 'check', 'law': LAW}]},
+                {'action': 'batch', 'actions': [
+                    {'action': 'fit', 'law': LAW},
+                    {'action': 'submit', 'law_ref': 'saved', 'claims': CLAIMS}]}])
+            def tool(source, *args, **kwargs):
+                return {'ok': True, 'law': FITTED if kwargs['fit'] else source}
+            with serve_session(session) as auth, patch('agent.run.candidate_tool', side_effect=tool):
+                outcome = DiscoveryAgent(Console(auth['endpoint'], auth['token']), model, root/'agent').run()
+            self.assertEqual(outcome['status'], 'submitted')
+            self.assertEqual(len(model.calls), 3)
+            self.assertEqual(session.console.budget['energy_used'], 2)
+            artifact = Path(session.latest['artifact_directory'])
+            self.assertEqual((artifact/'law.py').read_text(), FITTED)
+            self.assertEqual(json.loads((artifact/'claims.json').read_text()), CLAIMS)
+            candidates = json.loads((root/'agent/candidates.json').read_text())
+            self.assertEqual(len(candidates), 2)
+            self.assertIsNone(candidates['C0001']['claims'])
+            self.assertEqual(candidates['C0002']['claims'], CLAIMS)
+            self.assertEqual((root/'agent/candidates/C0002.py').read_text(), FITTED)
+
+    def test_saved_last_fit_and_draft_refs_distinguish_law_from_complete_pair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, console = self.direct(directory)
+            original = agent._pair(LAW, CLAIMS)['candidate_id']
+            with patch('agent.run.candidate_tool', return_value={'ok': True, 'law': FITTED}):
+                fitted = agent._action({'action': 'fit', 'law': OTHER})['candidate_id']
+            with patch('agent.run.candidate_tool', return_value={'ok': True, 'law': OTHER}):
+                checked = agent._action({'action': 'check', 'law': OTHER})['candidate_id']
+            self.assertEqual(agent._candidate({'law_ref': 'saved'})['candidate_id'], checked)
+            self.assertEqual(agent._candidate({'law_ref': 'last_fit'})['candidate_id'], fitted)
+            self.assertEqual(agent._candidate({'law_ref': 'draft'})['candidate_id'], original)
+            with self.assertRaises(ValueError):
+                agent._action({'action': 'submit', 'law_ref': 'saved'})
+            console.submit.assert_not_called()
+            self.assertEqual(agent.latest, {'law': LAW, 'claims': CLAIMS})
+            result = agent._action({'action': 'submit', 'candidate_id': fitted, 'claims': OTHER_CLAIMS})
+            self.assertEqual(result['candidate_id'], fitted)
+            self.assertEqual(agent.latest, {'law': FITTED, 'claims': OTHER_CLAIMS})
+            self.assertIsNone(agent.candidates[checked]['claims'])
+
+    def test_first_fit_without_claims_can_be_submitted_via_last_fit_in_same_batch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, console = self.direct(directory)
+            with patch('agent.run.candidate_tool', return_value={'ok': True, 'law': FITTED}):
+                result = agent._action({'action': 'batch', 'actions': [
+                    {'action': 'fit', 'law': LAW},
+                    {'action': 'submit', 'law_ref': 'last_fit', 'claims': CLAIMS}]})
+            self.assertTrue(result['ok'])
+            self.assertTrue(result['ends_exploration'])
+            self.assertFalse(result['results'][0]['result']['saved_pair'])
+            self.assertEqual(agent.latest, {'law': FITTED, 'claims': CLAIMS})
+            console.submit.assert_called_once()
+
+    def test_check_can_bind_explicit_claims_without_drafting_or_borrowing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, console = self.direct(directory)
+            with patch('agent.run.candidate_tool', return_value={'ok': True, 'law': LAW}):
+                result = agent._action({'action': 'check', 'law': LAW, 'claims': CLAIMS})
+            self.assertTrue(result['saved_candidate'])
+            self.assertFalse(result['saved_pair'])
+            self.assertIsNone(agent.latest)
+            console.save_draft.assert_not_called()
+            agent._action({'action': 'submit', 'candidate_id': result['candidate_id']})
+            self.assertEqual(agent.latest, {'law': LAW, 'claims': CLAIMS})
+
+    def test_unpaired_saved_candidate_never_fabricates_claims_at_turn_limit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = self.session(root)
+            model = Model([{'action': 'check', 'law': LAW}, {'action': 'archive'}, {'action': 'archive'}])
+            with serve_session(session) as auth, patch('agent.run.candidate_tool', return_value={'ok': True, 'law': LAW}):
+                outcome = DiscoveryAgent(Console(auth['endpoint'], auth['token']), model, root/'agent').run()
+            self.assertEqual(len(model.calls), 3)
+            self.assertEqual(outcome['status'], 'optional_turn_limit_no_submission')
+            self.assertFalse(outcome['has_saved_pair'])
+            self.assertIsNone(session.latest)
+            self.assertTrue((root/'agent/candidates/C0001.py').is_file())
+            self.assertFalse((root/'agent/claims.json').exists())
+
+    def test_failed_tool_does_not_replace_last_fit_or_latest_draft(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, _ = self.direct(directory)
+            agent._pair(LAW, CLAIMS)
+            with patch('agent.run.candidate_tool', return_value={'ok': True, 'law': FITTED}):
+                fitted = agent._action({'action': 'fit', 'law_ref': 'draft'})['candidate_id']
+            before = copy.deepcopy(agent.latest)
+            for name in ('check', 'fit'):
+                with self.subTest(action=name), patch('agent.run.candidate_tool',
+                        return_value={'ok': False, 'error': 'no valid trajectory'}):
+                    result = agent._action({'action': name, 'law': OTHER})
+                self.assertFalse(result['saved_candidate'])
+                self.assertEqual(agent.last_fit_candidate_id, fitted)
+                self.assertEqual(agent.saved_candidate_id, fitted)
+                self.assertEqual(agent.latest, before)
+
+    def test_unpaired_new_law_does_not_replace_last_complete_fallback(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = self.session(root)
+            model = Model([{'action': 'draft', 'law': LAW, 'claims': CLAIMS},
+                           {'action': 'check', 'law': OTHER}, {'action': 'archive'}])
+            with serve_session(session) as auth, patch('agent.run.candidate_tool',
+                    return_value={'ok': True, 'law': OTHER}):
+                outcome = DiscoveryAgent(Console(auth['endpoint'], auth['token']), model, root/'agent').run()
+            self.assertEqual(len(model.calls), 3)
+            self.assertEqual(outcome['status'], 'submitted_after_optional_turn_limit')
+            artifact = Path(session.latest['artifact_directory'])
+            self.assertEqual((artifact/'law.py').read_text(), LAW)
+            self.assertEqual(json.loads((artifact/'claims.json').read_text()), CLAIMS)
+            candidates = json.loads((root/'agent/candidates.json').read_text())
+            self.assertIsNone(candidates['C0002']['claims'])
+
+    def test_candidate_selector_conflicts_are_rejected_before_tool_or_submit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            agent, console = self.direct(directory)
+            candidate = agent._pair(LAW, CLAIMS)['candidate_id']
+            for selectors in ({'law': LAW, 'candidate_id': candidate},
+                              {'candidate_id': candidate, 'law_ref': 'saved'},
+                              {'candidate_id': 'C9999'}):
+                with self.subTest(selectors=selectors), patch('agent.run.candidate_tool') as tool:
+                    with self.assertRaises(ValueError):
+                        agent._action({'action': 'fit', **selectors})
+                    tool.assert_not_called()
+            console.submit.assert_not_called()
 
 
 if __name__ == '__main__': unittest.main()

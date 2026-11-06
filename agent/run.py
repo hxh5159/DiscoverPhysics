@@ -38,7 +38,7 @@ SYSTEM_PROMPT = """你是自动物理规律发现智能体。在未知二维环�
 {"action":"fit","law":"完整Python源代码","max_nfev":12}
 {"action":"draft","law":"完整Python源代码","claims":{"dynamics_order":2,"hidden_matter":false,"time_dependence":false}}
 {"action":"submit","law":"完整Python源代码","claims":{"dynamics_order":2,"hidden_matter":false,"time_dependence":false}}
-check/fit也可用"law_ref":"saved"代替law引用当前已保存候选。fit成功后，若输入law与已保存law相同，自动保存拟合返回的law及原claims；若显式提供claims则采用经格式校验的新声明。不同law没有显式claims时只返回拟合结果，不覆盖已保存配对。draft/submit也支持law_ref:"saved"，省略claims时复用该配对声明；没有有效配对时不能使用此引用。law和law_ref不能同时给出。
+check/fit/draft/submit用以下三者之一指定规律：law为完整Python源代码；candidate_id为工具返回的候选编号；law_ref为saved（最新已保存规律，可尚无claims）、last_fit（最近成功拟合规律）或draft（最后完整有效草稿）。三个选择字段不能同时给出。每次成功check/fit都会独立保存返回的law并给出candidate_id，不要求先填写claims。fit后的参数直接保留在该候选中，无需你重新抄写。draft/submit必须给出你判断的claims；仅当所引用候选已绑定claims时才可省略，不会借用其他候选的声明。显式claims经格式校验后优先采用。fit若已有该输入候选的声明或显式claims，会同时保存完整草稿；没有声明时仍保存规律，可随后submit并附claims。同一batch内先fit再submit时，law_ref:saved或last_fit会引用刚才实际拟合的结果。
 可以显式返回{"action":"batch","actions":[子动作1,子动作2]}，一次模型回复顺序执行1至8个动作；不能嵌套batch，submit只能放最后。每个实验照常计费、受原时间和配额限制；子动作失败即停止余下动作，保留最近有效草稿。批量内没有额外模型调用，也不会替你选实验、改规律或填写声明。
 所有坐标、属性和时刻按mission公开目录选择，不能把示例数字当作合法范围。source_properties与每个probe.properties须包含该宇宙目录的所有键，默认值见目录。物理时刻必须对齐0.005；t_launch为绝对物理时刻，readout为相对偏移。探针互不作用且不影响背景，但会自由运动。
 初始first_light包含合法探针轨迹和可见背景，已在MISSION中直接提供；当前8个时刻不会抽稀，不必先view_record才能使用。每次新探针收费1，observe免费但有独立次数；位置和速度有观测噪声。根据轨迹、方向、属性和投放相位辨别规律，不要直接差分噪声位置后过拟合。实验设计、推理、拟合均消耗本局现实时间。请保存有效draft再改进；是否追加实验由你判断，submit结束本局。
@@ -110,6 +110,11 @@ class DiscoveryAgent:
         self.records, self.events, self.history = [], [], []
         self.latest = None
         self.candidate_count = 0
+        self.candidates = {}
+        self.candidate_serial = 0
+        self.saved_candidate_id = None
+        self.last_fit_candidate_id = None
+        self.latest_candidate_id = None
         self.deadline = None
         self.last_budget = None
 
@@ -128,11 +133,30 @@ class DiscoveryAgent:
         if isinstance(record, dict) and isinstance(record.get("budget"), dict):
             self.last_budget = record["budget"]
 
-    def _pair(self, source, claims, *, submit=False):
+    def _register_candidate(self, source, *, origin, claims=None):
+        """Retain a checked law without requiring or inventing declarations."""
+        validate_source(source)
+        bound = None if claims is None else validate_claims(claims)
+        self.candidate_serial += 1
+        candidate_id = f"C{self.candidate_serial:04d}"
+        directory = self.directory/"candidates"
+        directory.mkdir(exist_ok=True)
+        (directory/f"{candidate_id}.py").write_text(source, encoding="utf-8")
+        self.candidates[candidate_id] = {"candidate_id": candidate_id, "law": source,
+                                         "claims": bound, "origin": origin}
+        self.saved_candidate_id = candidate_id
+        if origin == "fit":
+            self.last_fit_candidate_id = candidate_id
+        self._save_json("candidates.json", self.candidates)
+        return candidate_id
+
+    def _pair(self, source, claims, *, submit=False, candidate_id=None):
         if not isinstance(source, str):
             raise ValueError("law must contain complete Python source text.")
         validate_source(source)
-        validate_claims(claims)
+        claims = validate_claims(claims)
+        if candidate_id is not None and self.candidates[candidate_id]["law"] != source:
+            raise ValueError("The referenced candidate does not match this law.")
         if self.remaining() <= 0:
             raise TimeoutError("Exploration ended before candidate preparation.")
         # Separate filenames ensure an invalid revision never replaces our
@@ -147,29 +171,48 @@ class DiscoveryAgent:
             raise TimeoutError("Exploration ended before artifact submission.")
         method = self.console.submit if submit else self.console.save_draft
         result = method(law=str(law), claims=str(claim_file))
+        if candidate_id is None:
+            candidate_id = self._register_candidate(source, origin="submit" if submit else "draft", claims=claims)
+        else:
+            self.candidates[candidate_id]["claims"] = json.loads(_json(claims))
+            self.saved_candidate_id = candidate_id
+            self._save_json("candidates.json", self.candidates)
         self.latest = {"law": source, "claims": json.loads(_json(claims))}
+        self.latest_candidate_id = candidate_id
         (self.directory/"law.py").write_text(source, encoding="utf-8")
         self._save_json("claims.json", claims)
-        return result
+        return {**result, "candidate_id": candidate_id}
 
-    def _candidate_source(self, action):
-        if "law" in action and "law_ref" in action:
-            raise ValueError("Specify law or law_ref, not both.")
-        if "law_ref" in action:
-            if action["law_ref"] != "saved":
-                raise ValueError("law_ref must be saved.")
-            if self.latest is None:
-                raise ValueError("No valid saved candidate is available.")
-            return self.latest["law"]
-        if not isinstance(action.get("law"), str):
-            raise ValueError("Provide complete law source or law_ref: saved.")
-        return action["law"]
+    def _candidate(self, action):
+        selectors = [key for key in ("law", "candidate_id", "law_ref") if key in action]
+        if len(selectors) != 1:
+            raise ValueError("Specify exactly one of law, candidate_id or law_ref.")
+        if "law" in action:
+            source = action["law"]
+            if not isinstance(source, str):
+                raise ValueError("law must contain complete Python source text.")
+            for candidate in reversed(list(self.candidates.values())):
+                if candidate["law"] == source:
+                    return candidate
+            return {"candidate_id": None, "law": source, "claims": None}
+        if "candidate_id" in action:
+            candidate_id = action["candidate_id"]
+        else:
+            references = {"saved": self.saved_candidate_id, "last_fit": self.last_fit_candidate_id,
+                          "draft": self.latest_candidate_id}
+            reference = action["law_ref"]
+            if not isinstance(reference, str) or reference not in references:
+                raise ValueError("law_ref must be saved, last_fit or draft.")
+            candidate_id = references[reference]
+        if not isinstance(candidate_id, str) or candidate_id not in self.candidates:
+            raise ValueError("The requested saved law or candidate_id is not available.")
+        return self.candidates[candidate_id]
 
-    def _candidate_claims(self, action, source):
+    def _candidate_claims(self, action, candidate):
         if "claims" in action:
             return validate_claims(action["claims"])
-        if self.latest is not None and source == self.latest["law"]:
-            return json.loads(_json(self.latest["claims"]))
+        if candidate.get("claims") is not None:
+            return json.loads(_json(candidate["claims"]))
         return None
 
     def _batch(self, action):
@@ -230,27 +273,34 @@ class DiscoveryAgent:
                     page[key] = [record[key][i] for i in indices]
             return {"index": index, "full_time_count": total, "sample_indices": indices, "record": page}
         elif name in ("check", "fit"):
-            source = self._candidate_source(action)
-            claims = self._candidate_claims(action, source) if name == "fit" else None
+            candidate = self._candidate(action)
+            source = candidate["law"]
+            claims = self._candidate_claims(action, candidate)
             result = candidate_tool(source, self.mission, self.records,
                 fit=name == "fit", max_nfev=action.get("max_nfev", 12),
                 timeout=max(.001, min(self.tool_timeout, self.remaining())))
             if self.remaining() <= 0:
                 raise TimeoutError("Exploration ended while running the candidate tool.")
-            if name == "fit" and isinstance(result, dict):
+            if isinstance(result, dict):
                 result = dict(result)
                 result["saved_candidate"] = False
-                if result.get("ok") is True and claims is not None:
-                    result["draft"] = self._pair(result["law"], claims)
+                result["saved_pair"] = False
+                if result.get("ok") is True:
+                    candidate_id = self._register_candidate(result["law"], origin=name, claims=claims)
+                    result["candidate_id"] = candidate_id
                     result["saved_candidate"] = True
-                elif result.get("ok") is True:
-                    result["save_note"] = "No matching saved candidate or explicit claims; fitted law was returned without replacing the saved pair."
+                    if name == "fit" and claims is not None:
+                        result["draft"] = self._pair(result["law"], claims, candidate_id=candidate_id)
+                        result["saved_pair"] = True
+                    elif claims is None:
+                        result["save_note"] = "Law saved independently; provide your claims when drafting or submitting this candidate."
         elif name in ("draft", "submit"):
-            source = self._candidate_source(action)
-            claims = self._candidate_claims(action, source)
+            candidate = self._candidate(action)
+            source = candidate["law"]
+            claims = self._candidate_claims(action, candidate)
             if claims is None:
                 raise ValueError("This law needs explicit claims before draft or submit.")
-            result = self._pair(source, claims, submit=name == "submit")
+            result = self._pair(source, claims, submit=name == "submit", candidate_id=candidate["candidate_id"])
         else:
             raise ValueError("Unknown action; use observe/launch/archive/view_record/check/fit/draft/submit/batch.")
         if isinstance(result, dict) and isinstance(result.get("budget"), dict):
@@ -259,7 +309,12 @@ class DiscoveryAgent:
 
     def _messages(self, turn):
         state = {"remaining_seconds": round(self.remaining(), 3), "budget": self.last_budget,
-                 "record_count": len(self.records), "saved_candidate": self.latest,
+                 "record_count": len(self.records),
+                 "saved_candidate": self.candidates.get(self.saved_candidate_id),
+                 "candidate_references": {"saved": self.saved_candidate_id,
+                     "last_fit": self.last_fit_candidate_id, "draft": self.latest_candidate_id},
+                 "last_valid_pair": None if self.latest is None else {
+                     "candidate_id": self.latest_candidate_id, "claims": self.latest["claims"]},
                  "turn": turn, "max_turns": self.max_turns,
                  "remaining_model_calls_including_current":
                      self.max_turns-turn+1 if self.max_turns else None,
@@ -268,7 +323,7 @@ class DiscoveryAgent:
         if self.max_turns:
             state["instruction"] += " Plan experiments and candidate generation within the remaining model calls."
             if turn == self.max_turns:
-                state["instruction"] += " This is the final model call. Return submit, or a batch ending with submit. You may use law_ref: saved to submit the latest valid pair without repeating its source; a successful fit with bound claims also saves that fitted pair. No experiment is mandatory."
+                state["instruction"] += " This is the final model call. Return submit, or a batch ending with submit. candidate_id or law_ref (saved/last_fit/draft) avoids repeating source; attach your claims if that candidate has none. A successful fit always saves its law even before claims are supplied. No experiment is mandatory."
         essential = [{"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "MISSION:\n"+_json(compact(self.mission))},
             {"role": "user", "content": "CURRENT_STATE:\n"+_json(state)}]
