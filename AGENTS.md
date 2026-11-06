@@ -1660,6 +1660,13 @@ agent/models.py增加显式可选SHORE_STRUCTURED_OUTPUT=json_schema，默认off
 - 可将改进集中在指挥部执行层，继续接受agent目录与models.json两类路径：小型策略暂存到私有工作区；策略、所有checkpoint/adapter和依赖只读访问；不复制大模型；唯一可写空间及HOME、临时目录、缓存、日志和共享内存均限于指挥部私有运行区。约束须覆盖模型服务、工具、所有后代进程及候选计算程序；不能复用由参赛者管理并可能记录请求的模型服务。
 - 上述为待实现方案，不是当前防护能力的声明。可靠执行还依赖目标Linux实例支持相应文件系统、进程与网络访问限制，并须在目标环境做写回拦截及正常推理验收。只在Python里约定输出路径或清空日志不能替代系统权限约束。模型在测评期间接收观测是任务所需，保密目标是参赛者在赛中不能取得这些观测及其派生记忆/更新权重。
 
+### 7.112 参赛README整合与可移除说明清单（2026-11-06）
+
+- 用户要求梳理所有类似重复/陈旧说明，将有效信息全部合并到README，并告知可删除文件。已更新打包源稿docs/PARTICIPANT_README.md，映射为参赛包根README.md；当前510行，较长的控制台、规律、环境和六开发资料放4个折叠段。原说明文件本轮全部保留，未删除。
+- 已合并完整strategy/models字段、多模型与LoRA、两层提交、Console调用/档案/通信错误、完整law输入输出和候选元数据、四类失败处理、正式写入边界、模型检查/部署、可选cu128构建、六开发公式/属性/范围/噪声/原点数值边界。未将旧三界措辞、旧镜像提交流程、397B预置、能量24、不存在报告和历史验收分数表当作现行要求迁入；没有新增SDK/SHA概念。
+- 合并后可从参赛包精简14份自然语言说明：START_HERE.txt；development_worlds/README.md；docs下QUICKSTART、PARTICIPANT_FILES、STRATEGY_SUBMISSION、SUBMISSION_API、CONTEST_WORKFLOW、CODE_AND_SUBMISSION_SPEC、MODEL_RUNTIME、MODELS、H200_OFFLINE_SETUP、CUDA128_SETUP、CONSOLE_API、LAW_API各txt。真正移除前仍需同步打包必需列表/导航/文件记录；保留程序、依赖、JSON、示例、许可证、PDF及README源稿。本轮90成员不减少，不声称已发布76成员精简包。完整对应表在仓外readme_consolidation_20261106/文档合并与可移除清单.md。
+- 当前starter-v15、runtime-strategy-v5和测试r20仅更新README及必要派生记录，文档修订15；运行版本、全部程序、PDF、旧手册、世界、参数、噪声及评分保持。cu128自动加载与已部署cu130服务接入的区别及LoRA限制已明示；未修复自动加载版本锁、全模型三轮计数、隐藏运行写回或选集披露问题，也未把尚未实施的交付代码实物方案改写为现行接口。
+
 ## 8. 当前仓库的可复用部分与已确认缺口
 
 ### 8.1 仓库状态
