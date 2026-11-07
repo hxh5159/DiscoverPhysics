@@ -98,13 +98,13 @@ MPY="$ENVROOT/.venv-vllm-cu128/bin/python"
 
 为避免在模型选择上带来分歧和差距，故保留以上几个模型，同时考虑算力资源和微调所需算力，不再保留需要4卡才能加载的模型。本说明针对赛题的H200资源配置；实际卡数还取决于精度、上下文和推理/训练方式。基础程序默认使用4卡并行，并不表示每个保留模型都必须使用4卡才能加载。
 
-公共模型目录为 `/inspire/hdd/project/26-the-other-shore/public/models`。根目录 `models.json` 默认使用其中的Qwen3.8-27B。选用其它模型、训练后的完整权重或LoRA时，在清单中逐项填写唯一 `id`、白名单模型名称 `base_model`、完整权重路径 `path`，以及需要时的LoRA目录 `adapter_path`，并用 `primary_model_id` 指定主模型。示例见 `examples/models.json`、`examples/models.multi.json`。更换权重后应重新加载模型，避免继续调用旧权重。
+公共模型目录为 `/inspire/hdd/project/26-the-other-shore/public/models`。根目录 `models.json` 默认使用其中的Qwen3.8-27B。选用其它模型、训练后的完整权重或LoRA时，在清单中逐项填写唯一 `id`、白名单模型名称 `base_model`、完整权重路径 `path`，以及需要时的LoRA目录 `adapter_path`，并用 `primary_model_id` 指定主模型。正式提交时，全部 `path` 与 `adapter_path` 必须填写指挥部可读取的共享盘绝对路径。示例见 `examples/models.json`、`examples/models.multi.json`，其中相对路径示例须改为本次实际绝对路径。更换权重后应重新加载模型，避免继续调用旧权重。
 
 同一个白名单模型可以加载多个实例，分别承担规划、拟合、复核等任务。多个实例使用相同的一份权重时，可以复用同一个路径和清单ID，无需重复复制；使用不同的微调权重或LoRA时，必须在 `models.json` 中分别列出，并设置不同的ID。多个模型、多个实例的调用和显存安排均由本队 `agent/run.py` 统一协调，权重文件不必复制到策略目录。
 
 ## 开始一次完整自测
 
-以下在开发包根目录执行，`PY`、`MPY` 使用前文准备好的两个解释器。先编辑 `agent/strategy.json` 填写本队身份与版本，并检查 `models.json` 的实际路径：
+以下在开发包根目录执行，`PY`、`MPY` 使用前文准备好的两个解释器。先编辑 `agent/strategy.json` 填写本队身份与版本，并检查 `models.json` 的实际路径。六开发宇宙仍按下面的 `agent/` 和 `models.json` 路径运行，不向本地运行器传ZIP：
 
 ```bash
 "$PY" scripts/validate_strategy.py \
@@ -157,7 +157,36 @@ MPY="$ENVROOT/.venv-vllm-cu128/bin/python"
 {"dynamics_order": 1, "hidden_matter": false, "time_dependence": true}
 ```
 
-向指挥部提交的是**两类绝对路径**：完整 `agent/` 策略目录的路径，以及列全本次模型/LoRA的 `models.json` 文件路径。不是赛前手填九份规律答案，也不要求上传巨大的模型权重文件。提交前完成目录和权重检查，并确认所有训练后的权重已经保存完毕；测评期间禁止编辑本次代码、配置和权重，全程无人干预。
+向指挥部提交的是 **`submission.zip` 文件**。ZIP根目录直接包含完整 `agent/` 目录树和 `models.json` 文件，不再在外层套一个项目目录；只打包这两项，不打包公开实验环境、依赖环境、结果目录或模型权重。`agent/run.py`仍是统一入口，`agent/strategy.json`仍登记本队身份与版本。多智能体、提示词、工具、配置及运行时记忆均随 `agent/` 一并交付。
+
+```text
+submission.zip
+  agent/
+    __init__.py
+    run.py
+    strategy.json
+    models.py、tools.py及本队其它策略文件
+    prompts/、memory/等本队运行时资产
+  models.json
+```
+
+模型权重及LoRA适配器保留在共享盘，不放入ZIP。`models.json`须逐项列全本次使用的模型ID、完整权重与适配器，所有 `path`、`adapter_path` 均为可读取的共享盘绝对路径；不同训练版本、不同LoRA分别登记。不是赛前手填九份规律答案；`law.py`与`claims.json`仍在正式运行中由智能体逐宇宙自动生成。
+
+除根目录models.json外，其余文件均须位于agent/内；禁止符号链接或路径越界成员。组织端默认技术接收上限为解压后1GiB、10000个成员；若合法策略或记忆资产超过，应提前请指挥部调整接收上限。这不是实验配额或计分项，不要通过把权重、依赖环境或大训练数据放进agent来代替模型路径登记。
+
+在开发包根目录执行以下命令。先通过原有路径检查，再用Python标准库打包和检查ZIP；检查器不加载模型，也不能代替完整自测：
+
+```bash
+"$PY" scripts/validate_strategy.py \
+  --agent-dir "$PWD/agent" --models-file "$PWD/models.json" --check-files &&
+test ! -e submission.zip &&
+"$PY" -m zipfile -c submission.zip agent models.json &&
+"$PY" -m zipfile -t submission.zip
+```
+
+已有 `submission.zip` 时上述命令停止，不覆盖旧版本；下一次改用新文件名，例如 `submission-v2.zip`，并相应修改命令中的文件名。打包过程中不要修改策略或清单；只有打包和ZIP检查都成功后才交给指挥部，不能提交仍在写入或中途失败的ZIP。原有路径检查允许开发时使用相对模型路径，正式打包前仍须逐项确认已改为共享盘绝对路径。提交前确认训练检查点均已保存完毕，测评期间禁止编辑本次代码、配置或改写所引用权重，全程无人干预。
+
+**本README的ZIP要求替代旧版赛题PDF和旧说明中的“两条路径交付”要求。** 六开发宇宙的运行命令保持不变；指挥部受理ZIP后私有复制并解压，再按内部 `agent/`、`models.json` 路径启动。该正式ZIP受理入口只在指挥部侧提供，无需修改选手固定运行组件、清单字段结构或六开发命令，也无需把ZIP传给 `development_worlds.runner`。
 
 每组最多6次正式测评，六开发宇宙本地自测不限此次数。排名取最好的一次完整测评成绩，不拼接历史各宇宙最高分。赛中仅反馈加权总分与各宇宙总分，不反馈预言/定律/节约细项、声明正误或隐藏运行日志、观测、新记忆与更新权重。
 
@@ -205,9 +234,9 @@ P   = 80 / (1 + 10e)
   requirements.txt           实验、拟合和计分依赖
 ```
 
-正式运行需要的非权重自定义资产全部位于 `agent/`，包内导入使用 `agent`命名空间，例如 `from agent.agents import planner`；不能依赖根目录另一个自编模块或外置提示词。训练代码、训练数据和六公开开发结果可放在其它位置。`shore_agent/`、旧提交脚本只作兼容，新策略仍从 `agent/run.py`启动。示例文件可复制后改写，不是正式宇宙参考解；两个Dockerfile只是可选构建示例，当前提交不要求镜像。
+正式运行需要的非权重自定义资产全部位于 `agent/`，包内导入使用 `agent`命名空间，例如 `from agent.agents import planner`；读取提示词、配置和记忆时以当前运行的 `agent/` 文件位置为基准，不写死本组原项目的绝对位置，也不能依赖根目录另一个自编模块或外置提示词。正式运行使用指挥部接收ZIP后复制的策略，原项目位置不作为运行依赖。训练代码、训练数据和六公开开发结果可放在其它位置，但不随正式ZIP打包。`shore_agent/`、旧提交脚本只作兼容，新策略仍从 `agent/run.py`启动。示例文件可复制后改写，不是正式宇宙参考解；两个Dockerfile只是可选构建示例，当前提交不要求镜像。
 
-**提示词修改只能用于推理策略。** 正式运行仅允许写入本局指定输出及允许的临时目录；输出位置由 `RIFT_OUTPUT_DIR`提供。隐藏观测、对话、日志、新记忆和更新权重不得写回队伍策略目录、原权重目录或其它队员可取得的位置。公开自测可使用本队 `results/`，不能把该开发目录惯例套用于隐藏运行。训练新权重另存本队可写目录，不改指挥部公共权重。
+**提示词修改只能用于推理策略。** 指挥部在私有副本中运行接收的策略，不回写队伍原 `agent/`。正式运行仅允许写入本局指定输出及允许的临时目录；输出位置由 `RIFT_OUTPUT_DIR`提供。隐藏观测、对话、日志、新记忆和更新权重不得写回队伍策略目录、原权重目录或其它队员可取得的位置。公开自测可使用本队 `results/`，不能把该开发目录惯例套用于隐藏运行。训练新权重另存本队可写目录，不改指挥部公共权重。
 
 ### 两份清单的字段与路径
 
@@ -217,7 +246,7 @@ P   = 80 / (1 + 10e)
 {"schema_version":"1.0.0","team_id":"team01","submission_id":"run01","version":"1.0.0"}
 ```
 
-`models.json`包含 `schema_version="1.0.0"`、`primary_model_id`和 `models`数组。每项必填唯一 `id`、白名单 `base_model`和 `path`，可填 `role`、`adaptation`和 `adapter_path`。`adaptation`只接受 `base`、`quantized`、`sft`、`rl`、`other`，LoRA通过adapter_path表达，不填写lora作为adaptation。完整权重只填path；LoRA同时给出底座path和适配器adapter_path。**相对路径以models.json所在目录为基准，不以当前终端目录为基准。** 示例见 `examples/models.json`、`examples/models.multi.json`。
+`models.json`包含 `schema_version="1.0.0"`、`primary_model_id`和 `models`数组。每项必填唯一 `id`、白名单 `base_model`和 `path`，可填 `role`、`adaptation`和 `adapter_path`。`adaptation`只接受 `base`、`quantized`、`sft`、`rl`、`other`，LoRA通过adapter_path表达，不填写lora作为adaptation。完整权重只填path；LoRA同时给出底座path和适配器adapter_path。**正式ZIP内全部path与adapter_path均须为指挥部可读取的共享盘绝对路径，不能填相对路径。** 六开发的原有路径解析仍保持不变；若开发时使用相对路径，它相对models.json所在目录解析，但正式打包前必须转换为实际绝对路径。示例见 `examples/models.json`、`examples/models.multi.json`，不要将其中相对路径占位值直接用于正式提交。
 
 team_id、submission_id及模型id使用1—64个ASCII字母、数字、下划线、点或连字符，首字符须为字母或数字；同一清单内模型id唯一。version是本次方案版本字符串，不是模型选择键。
 
@@ -231,7 +260,7 @@ team_id、submission_id及模型id使用1—64个ASCII字母、数字、下划�
 
 第一束光已在初始任务中提供；无须先请求同一档案才能使用。`--max-turns 0`虽仍存在于兼容命令行，参赛时不得用它取消三轮限制。当前实现没有统一统计全部子模型调用，不能把本地主循环计数描述成已经完成全模型总次数的技术强制检查。
 
-队员提交策略与模型清单，智能体逐界自动交law/claims，是两层不同的提交。当前发放程序仍按两类绝对路径受理，不应擅自改成旧submission.json或容器入口。受理并冻结版本后，启动策略和模型，领取任务与首光，自动实验、拟合、交卷，最后固定积分评分并汇总。策略逐宇宙重新启动，不保证模型进程自动复用；复用服务须确认它属于本次权重。
+队员提交含完整agent与模型清单的ZIP，智能体逐界自动交law/claims，是两层不同的提交。指挥部接收、私有复制并解压本次ZIP，按清单读取全部已声明权重；内部运行仍使用agent目录与models.json路径，不改成旧submission.json或容器入口。受理并冻结版本后，启动策略和模型，领取任务与首光，自动实验、拟合、交卷，最后固定积分评分并汇总。策略逐宇宙重新启动，不保证模型进程自动复用；复用服务须确认它属于本次权重。
 
 每组最多6次正式测评，六公开本地自测不占次数。截止以成功受理时间判断，截止前受理可在截止后完成；没有成功受理任何有效版本则记0分。允许复用合法公开开发数据与模型成果，不授予读取历史私有运行目录或其他组数据的权限。榜单使用最佳一次完整成绩，不拼接逐宇宙历史最高分。
 
